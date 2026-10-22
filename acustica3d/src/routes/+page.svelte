@@ -29,9 +29,26 @@
 			timer = setTimeout(poll, busy ? 1500 : 10 * 60 * 1000);
 		};
 		poll();
+		// al volver a la ventana se pide una consulta (el lanzador la limita a una cada 5 minutos)
+		const onBack = async () => {
+			if (document.visibilityState !== 'visible' || upd?.state === 'ready' || upd?.state === 'downloading') return;
+			try {
+				const r = await fetch('/api/update/check', { method: 'POST' });
+				if (r.ok && (await r.json()).checking) {
+					clearTimeout(timer);
+					timer = setTimeout(poll, 1500);
+				}
+			} catch {
+				/* sin lanzador */
+			}
+		};
+		window.addEventListener('focus', onBack);
+		document.addEventListener('visibilitychange', onBack);
 		return () => {
 			stop = true;
 			clearTimeout(timer);
+			window.removeEventListener('focus', onBack);
+			document.removeEventListener('visibilitychange', onBack);
 		};
 	});
 	async function restartNow() {

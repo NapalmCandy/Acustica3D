@@ -33,10 +33,10 @@ La prueba sintética (`skp.spec.ts`) construye un `.skp` mínimo. Con `SKP_FILE=
 
 - Al cambiar `version` en `package.json` en `main`, `.github/workflows/release.yml` publica la release `vX.Y.Z` con `Acustica3D_win64.zip` y `Acustica3D_win64.pack`. También se puede lanzar a mano con *Run workflow*.
 - **Actualizador de `Acustica3D.exe`:**
-  - Consulta `releases/latest` al arrancar y cada 6 h.
+  - Consulta `releases/latest` al arrancar, cada 6 h y al volver a la ventana (`POST /api/update/check`, como mucho una vez cada 5 min).
   - Descarga el `.pack` a `actualizacion\` y lo instala al cerrar (o con `POST /api/update/restart`).
   - La app muestra el estado con `GET /api/update`.
-  - Para probarlo hay que apuntar `SALA3D_UPDATE_URL` a un servidor de pruebas.
+  - Para probarlo hay que apuntar `ACUSTICA3D_UPDATE_URL` a un servidor de pruebas.
 
 ## Física
 
@@ -71,6 +71,9 @@ Prueba de extremo a extremo en Chromium: `node testdata/e2e.mjs URL gpu|cpu`. Co
 
 
 ## Historial de cambios
+
+### v0.4.1
+- Busca actualizaciones también al volver a la ventana (como mucho una vez cada 5 minutos).
 
 ### v0.4
 - Abre los `.skp` de SketchUp directamente (2021 o posterior), sin exportar a `.dae`. Respeta lo oculto y las etiquetas ocultas, los materiales con su color, y los componentes y grupos con sus transformaciones.

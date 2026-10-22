@@ -46,11 +46,11 @@ Idioma de trabajo: **español**. El usuario produce hardcore/gabber, escucha alt
 - **Commits:** el autor es el usuario (`NapalmCandy <12048931+NapalmCandy@users.noreply.github.com>`), sin coautoría de Claude.
 - **Etiquetas:** desde las sesiones en la nube no se pueden subir etiquetas (403 del proxy); por eso las releases las crea el flujo.
 - **Actualizador** de `launcher/acustica3d.c`:
-  - Consulta `releases/latest` (WinHTTP) y descarga el `.pack` a `actualizacion\`.
+  - Consulta `releases/latest` (WinHTTP) al arrancar, cada 6 h y al volver a la ventana (`POST /api/update/check`, una vez cada 5 min como mucho), y descarga el `.pack` a `actualizacion\`.
   - Lo instala al cerrar, renombrando el `.exe` en marcha a `.old`.
   - La app lo muestra con `GET /api/update` y reinicia con `POST /api/update/restart` (comprueba `Origin`).
   - Formato del `.pack`: `scripts/package.mjs`.
-  - Se puede probar con `SALA3D_UPDATE_URL` y Wine.
+  - Se puede probar con `ACUSTICA3D_UPDATE_URL` y Wine.
 
 ## Pendiente / ideas
 - Usar el `.dae` real del usuario.

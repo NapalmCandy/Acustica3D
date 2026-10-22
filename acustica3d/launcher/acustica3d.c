@@ -8,16 +8,19 @@
  *    tampoco, el navegador predeterminado.
  * 3. Al cerrar esa ventana, Acustica3D termina.
  *
- * 4. Actualización automática: al arrancar (y cada 6 horas) consulta la última versión publicada en
+ * 4. Actualización automática: al arrancar, cada 6 horas y al volver a la ventana (como mucho una vez
+ *    cada 5 minutos: GitHub limita las consultas sin identificar) consulta la última versión publicada en
  *    GitHub (NapalmCandy/Acustica3D). Si es más nueva, la descarga en segundo plano a la carpeta
  *    "actualizacion" y la instala al cerrar Acustica3D (o al momento con «Reiniciar ahora» en la app).
- *    La app pregunta el estado en GET /api/update y pide reiniciar con POST /api/update/restart.
+ *    La app pregunta el estado en GET /api/update, pide una consulta con POST /api/update/check y
+ *    reiniciar con POST /api/update/restart.
  *
  * 5. El programa se llamó antes Sala3D.exe: si se arranca con ese nombre, se copia como Acustica3D.exe,
  *    abre esa copia y se cierra; la copia borra el Sala3D.exe antiguo.
  *
  * Opción --no-browser: solo servidor, sin ventana (para pruebas).
- * Variable SALA3D_UPDATE_URL: otra dirección para la consulta de versiones (para pruebas).
+ * Variables para pruebas: ACUSTICA3D_UPDATE_URL (otra dirección para la consulta de versiones) y
+ * ACUSTICA3D_CHECK_MIN_S (segundos mínimos entre consultas pedidas desde la app; 300 por defecto).
  */
 #define WIN32_LEAN_AND_MEAN
 #define UNICODE
@@ -54,6 +57,9 @@ static char g_upd_latest[32] = "";
 static char g_upd_msg[256] = "";
 static long long g_upd_done = 0, g_upd_total = 0;
 static volatile LONG g_restart = 0;
+static HANDLE g_check_evt = NULL;      /* despierta al hilo de actualización */
+static volatile DWORD g_last_check = 0; /* GetTickCount() de la última consulta */
+static DWORD g_check_min_ms = 300000;
 
 static void set_state(const char *st, const char *msg)
 {
@@ -138,6 +144,17 @@ static void handle_api(SOCKET s, const char *method, const char *url, const char
                  APP_VERSION, g_upd_state, g_upd_latest, g_upd_done, g_upd_total, g_upd_msg);
         LeaveCriticalSection(&g_lock);
         send_json(s, body);
+        return;
+    }
+    if (!strcmp(url, "/api/update/check") && !strcmp(method, "POST")) {
+        if (!origin_ok(req)) { send_status(s, "403 Forbidden"); return; }
+        int idle;
+        EnterCriticalSection(&g_lock);
+        idle = !strcmp(g_upd_state, "none") || !strcmp(g_upd_state, "error");
+        LeaveCriticalSection(&g_lock);
+        int go = idle && GetTickCount() - g_last_check >= g_check_min_ms;
+        if (go) SetEvent(g_check_evt);
+        send_json(s, go ? "{\"checking\":true}" : "{\"checking\":false}");
         return;
     }
     if (!strcmp(url, "/api/update/restart") && !strcmp(method, "POST")) {
@@ -406,8 +423,9 @@ static void staging_dir(wchar_t *out) { _snwprintf(out, MAX_PATH, L"%ls\\actuali
 static int check_update(void)
 {
     set_state("checking", "");
+    g_last_check = GetTickCount();
     wchar_t api[1024];
-    DWORD n = GetEnvironmentVariableW(L"SALA3D_UPDATE_URL", api, 1024);
+    DWORD n = GetEnvironmentVariableW(L"ACUSTICA3D_UPDATE_URL", api, 1024);
     if (!n || n >= 1024) wcscpy(api, UPDATE_URL);
     char *json = NULL;
     size_t len = 0;
@@ -459,7 +477,7 @@ static DWORD WINAPI update_thread(LPVOID unused)
     (void)unused;
     for (;;) {
         if (check_update()) return 0;
-        Sleep(6 * 3600 * 1000);
+        WaitForSingleObject(g_check_evt, 6 * 3600 * 1000); /* 6 horas, o antes si la app lo pide */
     }
 }
 
@@ -591,6 +609,9 @@ int main(int argc, char **argv)
     --port;
     g_port = port;
     listen(g_listen, 64);
+    g_check_evt = CreateEventW(NULL, FALSE, FALSE, NULL);
+    wchar_t minbuf[16];
+    if (GetEnvironmentVariableW(L"ACUSTICA3D_CHECK_MIN_S", minbuf, 16)) g_check_min_ms = (DWORD)_wtoi(minbuf) * 1000;
     CreateThread(NULL, 0, update_thread, NULL, 0, NULL);
 
     if (no_browser) {
