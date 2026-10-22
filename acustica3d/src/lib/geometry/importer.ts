@@ -1,10 +1,11 @@
-// Importación de modelos exportados desde SketchUp (COLLADA .dae, OBJ .obj, glTF .glb/.gltf)
+// Importación de modelos de SketchUp (.skp directamente, o exportados: COLLADA .dae, OBJ .obj, glTF .glb/.gltf)
 // y extracción de triángulos con su material, en metros y con Y hacia arriba.
 import * as THREE from 'three';
 import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { NamedTris } from '../sim/testgeo';
+import { parseSkp } from './skp';
 
 export interface ImportedModel {
 	fileName: string;
@@ -54,7 +55,11 @@ export async function importFile(file: File): Promise<ImportedModel> {
 	const ext = name.split('.').pop()?.toLowerCase();
 	const warnings: string[] = [];
 	let object: THREE.Object3D;
-	if (ext === 'dae') {
+	if (ext === 'skp') {
+		const m = await parseSkp(new Uint8Array(await file.arrayBuffer()));
+		warnings.push(...m.warnings);
+		object = objectFromTris(m.tris, (n) => m.colors.get(n) ?? '#cccccc');
+	} else if (ext === 'dae') {
 		const text = await file.text();
 		const res = new ColladaLoader().parse(text, '');
 		if (!res) throw new Error('No se pudo leer el archivo COLLADA.');
@@ -71,7 +76,7 @@ export async function importFile(file: File): Promise<ImportedModel> {
 		const gltf = await new GLTFLoader().parseAsync(buf, '');
 		object = gltf.scene;
 	} else {
-		throw new Error('Formato no soportado. Exporta desde SketchUp como .dae (recomendado), .obj o .glb.');
+		throw new Error('Formato no soportado. Abre el .skp de SketchUp directamente, o expórtalo como .dae, .obj o .glb.');
 	}
 	const tris = extractTris(object);
 	if (!tris.materials.length) throw new Error('El modelo no contiene caras (triángulos).');

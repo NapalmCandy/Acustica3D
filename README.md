@@ -1,6 +1,6 @@
 # Acustica3D
 
-Programa para Windows que simula cómo suenan los graves **en tu sala** a partir de su modelo 3D de SketchUp y te dice dónde poner los altavoces, el subwoofer y tu silla.
+Programa para Windows que simula cómo suenan los graves **en tu sala** a partir de su modelo 3D de SketchUp (abre el `.skp` directamente) y te dice dónde poner los altavoces, el subwoofer y tu silla.
 
 - **Mapa de dónde se oye mejor:** en verde lo mejor y en rojo lo peor. Al mover la cabeza ves la curva de graves de ese punto al momento.
 - **Colocación automática:** prueba combinaciones de altavoces, sub y posición de escucha por toda la sala y te propone las mejores.

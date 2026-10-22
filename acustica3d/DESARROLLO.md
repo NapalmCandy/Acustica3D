@@ -20,6 +20,15 @@ node scripts/package.mjs 0.3.0   # dist/Acustica3D_win64.zip y .pack
 ```
 
 
+## Importador de .skp
+
+`src/lib/geometry/skp.ts` lee los `.skp` de SketchUp 2021 y posteriores sin el SDK de SketchUp. El formato está documentado al principio del archivo:
+- un ZIP con `model.dat`;
+- un árbol de bloques etiqueta + longitud;
+- vértices, aristas, caras con bucles e instancias con su matriz por filas.
+
+La prueba sintética (`skp.spec.ts`) construye un `.skp` mínimo. Con `SKP_FILE=ruta.skp npx vitest run` también se prueba un archivo real. Los archivos reales de otras personas no se suben al repositorio.
+
 ## Versiones y actualizaciones
 
 - Al cambiar `version` en `package.json` en `main`, `.github/workflows/release.yml` publica la release `vX.Y.Z` con `Acustica3D_win64.zip` y `Acustica3D_win64.pack`. También se puede lanzar a mano con *Run workflow*.
@@ -62,6 +71,9 @@ Prueba de extremo a extremo en Chromium: `node testdata/e2e.mjs URL gpu|cpu`. Co
 
 
 ## Historial de cambios
+
+### v0.4
+- Abre los `.skp` de SketchUp directamente (2021 o posterior), sin exportar a `.dae`. Respeta lo oculto y las etiquetas ocultas, los materiales con su color, y los componentes y grupos con sus transformaciones.
 
 ### v0.3
 - **Colocación automática** (pestaña propia): coloca el oyente, los dos KH y el sub, prueba combinaciones por toda la sala y propone las 5 mejores con su puntuación frente a tu colocación actual. *Aplicar* mueve los equipos y vuelve a simular.

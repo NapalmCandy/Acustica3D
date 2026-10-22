@@ -91,10 +91,10 @@
 {#snippet modelo()}
 	<div class="flex flex-wrap gap-2">
 		<button class="btn-primary" onclick={() => fileInput.click()} disabled={loading}>
-			{loading ? 'Cargando…' : 'Cargar modelo (.dae, .obj, .glb)'}
+			{loading ? 'Cargando…' : 'Cargar modelo de SketchUp (.skp)'}
 		</button>
 		<button class="btn" onclick={loadDemo}>Sala de ejemplo</button>
-		<input id="model-file" bind:this={fileInput} type="file" accept=".dae,.obj,.glb,.gltf" class="hidden" onchange={onFile} />
+		<input id="model-file" bind:this={fileInput} type="file" accept=".skp,.dae,.obj,.glb,.gltf" class="hidden" onchange={onFile} />
 	</div>
 	{#if loadError}<p class="rounded-md bg-red-500/10 px-3 py-2 text-red-700 dark:text-red-300">⚠ {loadError}</p>{/if}
 	{#if app.modelName}
@@ -107,12 +107,12 @@
 		{#each app.warnings as w}<p class="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">⚠ {w}</p>{/each}
 	{/if}
 	<details class="text-xs text-muted">
-		<summary class="cursor-pointer">Cómo exportar desde SketchUp Pro</summary>
+		<summary class="cursor-pointer">Cómo preparar el modelo en SketchUp</summary>
 		<ol class="mt-2 list-decimal space-y-1 pl-4">
 			<li>Pon un material con nombre claro a cada superficie importante (p. ej. <em>Pladur</em>, <em>Falso_techo</em>, <em>Suelo_tarima</em>, <em>Ventana</em>, <em>Puerta</em>, <em>Panel_LR_50mm</em>, <em>Escritorio</em>).</li>
-			<li>Archivo › Exportar › Modelo 3D › <strong>COLLADA (.dae)</strong>.</li>
-			<li>En Opciones: marca <em>Exportar caras de dos lados</em> y <em>Triangular todas las caras</em>; desmarca aristas y texturas.</li>
+			<li>Guarda y carga aquí el <strong>.skp</strong> tal cual (SketchUp 2021 o posterior). Lo que esté oculto o en etiquetas ocultas no se importa.</li>
 			<li>La sala debe estar cerrada (puertas y ventanas como caras, no huecos).</li>
+			<li>También sirve exportarlo como <em>COLLADA (.dae)</em>, <em>.obj</em> o <em>.glb</em>.</li>
 		</ol>
 	</details>
 {/snippet}

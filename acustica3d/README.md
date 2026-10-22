@@ -13,10 +13,11 @@ Se abre en su propia ventana y **se actualiza solo** cuando hay una versión nue
 ## Cómo se usa
 
 1. **Prepara el modelo en SketchUp.** Da a cada superficie un material con un nombre claro (`Pladur`, `Falso_techo`, `Suelo_tarima`, `Ventana`, `Puerta`, `Escritorio`, `Panel_LR_50mm`…).
-2. **Expórtalo.** Ve a *Archivo › Exportar › Modelo 3D › COLLADA (.dae)*:
-   - marca *Triangular todas las caras* y *Exportar caras de dos lados*;
-   - desmarca aristas y texturas.
-3. **Cárgalo en Acustica3D.** Revisa el material acústico que se ha asignado a cada superficie (también acepta `.obj` y `.glb`).
+2. **Cárgalo en Acustica3D.**
+   - Abre directamente el archivo **`.skp`** (SketchUp 2021 o posterior); no hace falta exportar nada.
+   - Lo que esté oculto o en etiquetas ocultas no se carga, igual que no se ve en SketchUp.
+   - También acepta `.dae`, `.obj` y `.glb`.
+3. **Revisa los materiales.** Comprueba el material acústico que se ha asignado a cada superficie.
 4. **Coloca tus altavoces, el sub y tu cabeza.** Puedes escribir coordenadas o arrastrarlos en 3D. Añade paneles, trampas de graves o muebles si quieres probarlos.
 5. **Mira los resultados.** La simulación arranca sola y se va afinando en unos segundos; si mueves algo, se recalcula.
 
