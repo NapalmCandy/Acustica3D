@@ -132,8 +132,9 @@
 		if (!app.result?.plane) return;
 		busy = true;
 		const m = await requestMap(app.mapFreq, app.mapBand);
-		single = { values: m.values, ix: m.ix, iz: m.iz, nx: m.nx, nz: m.nz };
 		busy = false;
+		if (!m.values.length) return; // el cálculo nuevo aún no tiene ningún nivel: se queda el mapa anterior
+		single = { values: m.values, ix: m.ix, iz: m.iz, nx: m.nx, nz: m.nz };
 	}
 	$effect(() => {
 		void app.mapFreq; void app.mapBand; void app.result; void JSON.stringify(app.sub); void JSON.stringify(app.kh);

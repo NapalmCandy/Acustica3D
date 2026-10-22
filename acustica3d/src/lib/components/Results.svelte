@@ -8,6 +8,7 @@
 	import MapView from './MapView.svelte';
 	import BestSpotView from './BestSpotView.svelte';
 	import OptimizeView from './OptimizeView.svelte';
+	import HighFreqView from './HighFreqView.svelte';
 
 	const TABS = [
 		['mejor', 'Mejor posición'],
@@ -15,6 +16,7 @@
 		['respuesta', 'Respuesta'],
 		['decaimiento', 'Decaimiento'],
 		['mapa', 'Mapa de la sala'],
+		['agudos', 'Medios y agudos'],
 		['materiales', 'Superficies y reverberación']
 	] as const;
 
@@ -123,6 +125,8 @@
 	<div class="min-h-0 flex-1 p-3">
 		{#if app.resultsTab === 'colocar'}
 			<OptimizeView />
+		{:else if app.resultsTab === 'agudos'}
+			<HighFreqView />
 		{:else if !res}
 			<div class="flex h-full items-center justify-center text-sm text-muted">
 				{app.running ? 'Calculando la primera vista previa…' : app.tris ? 'Pulsa «Simular» para ver los resultados.' : 'Carga tu modelo de SketchUp o prueba la sala de ejemplo.'}

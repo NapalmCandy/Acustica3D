@@ -284,7 +284,8 @@ async function runLevels(r: RunRequest) {
 		prog(`Nivel ${li + 1}/${nL} (hasta ${fmax} Hz): discretizando`, 0);
 		const grid = voxelize(geo, dx, r.seed);
 		const prep = prepare(grid, geo, r.betaByMat);
-		planes = {};
+		// el mapa del nivel anterior sigue sirviendo (al mapa y a la animación) hasta tener el de este
+		const lvPlanes: typeof planes = {};
 		const results: LevelResult['results'] = [];
 		let K = 0;
 		let pulse = sourcePulse(prep.fs, fmax);
@@ -327,10 +328,11 @@ async function runLevels(r: RunRequest) {
 			} else out = run({ prep, ...args });
 			K = out.K;
 			pulse = out.pulse;
-			if (out.plane) planes[s.id] = out.plane;
+			if (out.plane) lvPlanes[s.id] = out.plane;
 			results.push({ id: s.id, irs: out.irs, sourceCell: out.sourceCell, receiverCells: out.receiverCells });
 		}
 		if (ctx) destroyGrid(ctx);
+		planes = lvPlanes;
 		pulseInfo = { pulse, fs: prep.fs, K };
 		prog(`Nivel ${li + 1}/${nL}: calculando el mapa de posiciones`, 1);
 		const ids = r.sources.map((s) => s.id);
@@ -352,7 +354,9 @@ async function runLevels(r: RunRequest) {
 
 function doMap(m: MapRequest) {
 	const ids = Object.keys(planes);
-	if (!ids.length || !pulseInfo) throw new Error('No hay simulación con mapa.');
+	// aún no hay ningún nivel terminado en este cálculo: respuesta vacía (no es un error del cálculo)
+	if (!ids.length || !pulseInfo)
+		return post({ type: 'map', reqId: m.reqId, values: new Float32Array(0), ix: new Int32Array(0), iz: new Int32Array(0), nx: 0, nz: 0 });
 	const p0 = planes[ids[0]];
 	const nCells = p0.ix.length;
 	const acc = new Float64Array(nCells);
@@ -390,7 +394,7 @@ let framesReq = 0;
 async function doFrames(m: FramesRequest) {
 	framesReq = m.reqId;
 	const ids = Object.keys(planes);
-	if (!ids.length || !pulseInfo) throw new Error('No hay simulación con mapa.');
+	if (!ids.length || !pulseInfo) return; // aún no hay ningún nivel terminado
 	const p0 = planes[ids[0]];
 	const nC = p0.ix.length;
 	const freqs: number[] = [];

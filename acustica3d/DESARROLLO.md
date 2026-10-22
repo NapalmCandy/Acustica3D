@@ -79,6 +79,11 @@ Prueba de extremo a extremo en Chromium: `node testdata/e2e.mjs URL gpu|cpu`. Co
 
 ## Historial de cambios
 
+### v0.8
+- **Medios y agudos (100 Hz – 20 kHz)**, pestaña nueva (`hf/imageSource.ts`, `hf/hf.worker.ts`, `HighFreqView.svelte`): método de la imagen sobre la geometría real (planos agrupados, punto de rebote dentro de la superficie, oclusión con rejilla uniforme y recorrido Amanatides–Woo), hasta orden 1–4. Cada camino: directividad estimada del KH 120 A (apuntando al oído), absorción del aire y del material de cada rebote por octavas (8 kHz vale para 16 kHz), respuesta eléctrica del KH (con el interruptor Treble). Más la cola difusa (Eyring, Q del KH, desde el final de las reflexiones calculadas). Reflectograma con la zona libre de reflexiones (−20 dB en 20 ms) y tabla de las reflexiones fuertes con sus superficies y puntos de rebote.
+- El mapa del nivel anterior sigue sirviendo mientras se calcula el siguiente: pedir un mapa a mitad de un nivel ya no da «No hay simulación con mapa» como error del cálculo.
+- El lanzador abre Edge con `--force_high_performance_gpu`: en equipos con dos gráficas, WebGPU usa la dedicada (NVIDIA/AMD) y no la integrada.
+
 ### v0.7.4
 - Colocación con «Solo la actual»: si la orientación actual está a menos de 15° de mirar de frente a una pared, se usa de frente (la cabeza dibujada no suele estar justo en el centro de los KH y torcía el triángulo).
 - En equipos rápidos la búsqueda sigue mientras quede tiempo (`timeS` en `PRECISION`: 1/4/15 min), con hasta 3 veces más posiciones; con el tratamiento se comprueban hasta 20 cambios si cada simulación tarda menos de 2 s. El resultado dice cuántas simulaciones se han hecho en total.

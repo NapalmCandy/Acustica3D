@@ -240,7 +240,7 @@
 
 {#snippet sim()}
 	<div class="grid grid-cols-2 gap-2 text-xs">
-		<label>Frecuencia máxima
+		<label>Frecuencia máxima (graves)
 			<select class="input w-full" bind:value={app.sim.fmax}>
 				{#each [150, 200, 300, 350, 400, 500] as f}<option value={f}>{f} Hz</option>{/each}
 			</select>
@@ -249,6 +249,7 @@
 		<label>Zona de escucha (± m)<input class="input w-full" type="number" min="0.05" max="0.6" step="0.05" bind:value={app.sim.areaHalf} /></label>
 		<label>Puntos por longitud de onda<input class="input w-full" type="number" min="6" max="16" step="1" bind:value={app.sim.ppw} /></label>
 	</div>
+	<p class="text-xs text-muted">Esta simulación de ondas es la de los graves. Medios y agudos, hasta 20 kHz: pestaña <button class="text-accent hover:underline" onclick={() => (app.resultsTab = 'agudos')}>«Medios y agudos»</button>.</p>
 	{#if est}
 		<p class="text-xs text-muted">Rejilla de {fmt(est.dx * 100, 1)} cm · ~{Math.round(est.cells / 1000).toLocaleString('es-ES')} mil celdas · {Math.round(est.steps).toLocaleString('es-ES')} pasos por fuente · estimado ≈ {est.seconds < 60 ? Math.ceil(est.seconds) + ' s' : Math.ceil(est.seconds / 60) + ' min'}</p>
 	{/if}

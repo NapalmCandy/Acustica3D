@@ -29,7 +29,11 @@
 	const Y = (d: number) => m.t + ((ymax - Math.max(ymin, Math.min(ymax, d))) / (ymax - ymin)) * (h - m.t - m.b);
 	const path = (f: number[], d: number[]) =>
 		f.map((ff, i) => (ff >= xmin && ff <= xmax ? `${i === 0 || f[i - 1] < xmin ? 'M' : 'L'}${X(ff).toFixed(1)},${Y(d[i]).toFixed(1)}` : '')).join('');
-	const xticks = $derived([10, 20, 30, 40, 50, 60, 80, 100, 150, 200, 300, 400, 500, 700, 1000].filter((t) => t >= xmin && t <= xmax));
+	// en gráficas que llegan a los kHz, menos marcas (si no, se amontonan)
+	const xticks = $derived(
+		(xmax > 2000 ? [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000] : [10, 20, 30, 40, 50, 60, 80, 100, 150, 200, 300, 400, 500, 700, 1000]).filter((t) => t >= xmin && t <= xmax)
+	);
+	const tickLabel = (t: number) => (t >= 1000 ? `${t / 1000}k` : String(t));
 	const yticks = $derived.by(() => {
 		const out: number[] = [];
 		for (let v = Math.ceil(ymin / 5) * 5; v <= ymax; v += 5) out.push(v);
@@ -71,7 +75,7 @@
 			{/each}
 			{#each xticks as t}
 				<line x1={X(t)} x2={X(t)} y1={m.t} y2={h - m.b} stroke="var(--c-grid)" stroke-width="0.7" />
-				<text x={X(t)} y={h - m.b + 14} text-anchor="middle" font-size="10" fill="var(--c-muted)">{t}</text>
+				<text x={X(t)} y={h - m.b + 14} text-anchor="middle" font-size="10" fill="var(--c-muted)">{tickLabel(t)}</text>
 			{/each}
 			<text x={(m.l + w - m.r) / 2} y={h - 3} text-anchor="middle" font-size="10" fill="var(--c-muted)">Frecuencia (Hz)</text>
 			<text transform="translate(11,{(m.t + h - m.b) / 2}) rotate(-90)" text-anchor="middle" font-size="10" fill="var(--c-muted)">{yLabel}</text>
@@ -96,7 +100,7 @@
 		{#if hoverF}
 			<div class="pointer-events-none absolute top-2 rounded-md border border-line bg-panel px-2 py-1.5 text-xs shadow-md"
 				style="left:{Math.min(X(hoverF) + 10, w - 170)}px">
-				<div class="font-semibold text-ink">{hoverF.toFixed(1)} Hz</div>
+				<div class="font-semibold text-ink">{hoverF >= 1000 ? `${(hoverF / 1000).toFixed(2)} kHz` : `${hoverF.toFixed(1)} Hz`}</div>
 				{#each curves as c}
 					<div class="flex items-center gap-1.5 text-ink"><span class="inline-block h-2 w-2 rounded-full" style="background:{c.color}"></span>{c.label}: {Number.isFinite(valueAt(c, hoverF)) ? `${valueAt(c, hoverF).toFixed(1)} dB` : 'sin datos'}</div>
 				{/each}

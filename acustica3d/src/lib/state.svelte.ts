@@ -136,7 +136,7 @@ class AppState {
 	hoverCell = $state(-1);
 
 	view = $state({ hideCeiling: true, wallOpacity: 0.85, showMap: true });
-	resultsTab = $state<'mejor' | 'colocar' | 'respuesta' | 'decaimiento' | 'mapa' | 'materiales'>('mejor');
+	resultsTab = $state<'mejor' | 'colocar' | 'respuesta' | 'decaimiento' | 'mapa' | 'agudos' | 'materiales'>('mejor');
 	smoothing = $state(12); // 1/12 oct
 	mapFreq = $state(60);
 	mapBand = $state(true);

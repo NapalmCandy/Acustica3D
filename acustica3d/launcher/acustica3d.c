@@ -718,7 +718,9 @@ int main(int argc, char **argv)
         wchar_t cmd[2048];
         _snwprintf(cmd, 2048,
                    L"\"%ls\" --app=%ls --user-data-dir=\"%ls\" --no-first-run --no-default-browser-check "
-                   L"--disable-extensions --disable-sync --window-size=1600,1000",
+                   L"--disable-extensions --disable-sync --window-size=1600,1000 "
+                   /* en portátiles y PC con dos gráficas, la de alto rendimiento (NVIDIA/AMD) para WebGPU */
+                   L"--force_high_performance_gpu",
                    browser, url, profile);
         STARTUPINFOW si;
         PROCESS_INFORMATION pi;

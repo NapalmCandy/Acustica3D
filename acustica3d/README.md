@@ -39,6 +39,7 @@ Se abre en su propia ventana y **se actualiza solo** cuando hay una versión nue
 - **Respuesta:** la curva de graves en tu sitio. Distingue los picos, que se pueden recortar con ecualización, de los huecos, que no.
 - **Decaimiento:** cuánto tarda en apagarse cada frecuencia, es decir, cuánto "retumba" la sala.
 - **Mapa de la sala:** cómo se reparte cada frecuencia por la habitación, de 20 a 300 Hz. Con **Play** se ve el barrido animado.
+- **Medios y agudos (100 Hz – 20 kHz):** las reflexiones que llegan a tu oído (de la mesa, la pantalla, el techo, las paredes…), con su retardo, su nivel y dónde rebotan, y la respuesta en tu sitio hasta 20 kHz. Dice si tienes zona libre de reflexiones. Desmarca «cuenta» en la mesa y verás al momento cuánto cambia.
 - **Superficies y reverberación:** cuánto absorbe cada material y el tiempo de reverberación de la sala.
 
 ## Cómo funciona
@@ -53,6 +54,6 @@ Todo se calcula en tu PC, con el procesador o con la tarjeta gráfica. Con esos 
 
 ## Limitaciones
 
-- Por ahora calcula **los graves**, hasta unos 300 Hz. Para medios y agudos solo da el tiempo de reverberación; las reflexiones tempranas y dónde poner los paneles llegarán más adelante.
+- Los graves se calculan con ondas (hasta 500 Hz); los medios y agudos, con reflexiones como espejos (sin difusión ni difracción) y una directividad estimada de los KH.
 - Los materiales usan valores típicos. Con medidas reales del micrófono (REW) se podrán ajustar a tu sala.
 - Las puntuaciones sirven para **comparar** sitios entre sí, no como nota absoluta.
