@@ -5,6 +5,7 @@ acustica3d/build/
 acustica3d/dist/
 acustica3d/artifact/
 acustica3d/launcher/Acustica3D.exe
+acustica3d/launcher/*.res
 acustica3d/testdata/capturas/
 plugin/build/
 plugin/build-win/

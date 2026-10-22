@@ -54,9 +54,11 @@ jobs:
           update: false
           install: mingw-w64-x86_64-gcc
       - name: Acustica3D.exe
-        run: >
-          gcc -O2 -Wall -mwindows -static -DAPP_VERSION="\"${{ needs.version.outputs.version }}\""
-          -o acustica3d/launcher/Acustica3D.exe acustica3d/launcher/acustica3d.c -lws2_32 -lshell32 -ladvapi32 -lwinhttp
+        run: |
+          windres acustica3d/launcher/acustica3d.rc -O coff -o acustica3d/launcher/acustica3d.res
+          gcc -O2 -Wall -mwindows -static -DAPP_VERSION="\"${{ needs.version.outputs.version }}\"" \
+            -o acustica3d/launcher/Acustica3D.exe acustica3d/launcher/acustica3d.c acustica3d/launcher/acustica3d.res \
+            -lws2_32 -lshell32 -ladvapi32 -lwinhttp -lole32
       - uses: actions/upload-artifact@v4
         with:
           name: exe

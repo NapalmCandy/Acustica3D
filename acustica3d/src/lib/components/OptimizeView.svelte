@@ -169,7 +169,12 @@
 						<option value="varias">50°, 60° y 70°</option><option value="equilatero">Solo 60° (equilátero)</option>
 					</select>
 				</label>
-				<label class="col-span-2 flex items-end gap-2 pb-1"><input type="checkbox" bind:checked={app.optOptions.tuneSub} disabled={opt.running || !app.sub.enabled} /> Ajustar el sub (corte, nivel, filtro de 85 Hz)</label>
+				<label class="col-span-2">Búsqueda
+					<select class="input w-full" bind:value={app.optOptions.method} disabled={opt.running}>
+						<option value="bayes">Bayesiana (rápida: elige qué sitios simular)</option><option value="rejilla">Rejilla (simula toda la sala, lenta)</option>
+					</select>
+				</label>
+				<label class="col-span-3 flex items-center gap-2"><input type="checkbox" bind:checked={app.optOptions.tuneSub} disabled={opt.running || !app.sub.enabled} /> Ajustar el sub (corte, nivel, filtro de 85 Hz)</label>
 				{#if KH_EQ.enabled}
 					<label class="col-span-3 flex items-center gap-2"><input type="checkbox" bind:checked={app.optOptions.tuneKh} disabled={opt.running} /> Ajustar los interruptores Bass y Low-Mid de los KH</label>
 				{/if}
@@ -182,11 +187,16 @@
 				{/if}
 			</div>
 			<p class="mt-1.5 text-muted">
-				Prueba posiciones de tu cabeza por toda la sala; para cada una, los KH a {fmt(Math.max(0.8, app.listenRange[0]), 1)}–{fmt(Math.min(2, app.listenRange[1]), 1)} m (cada 10 cm) {app.optOptions.apertures === 'varias' ? 'con aperturas de 50°, 60° y 70°' : 'en triángulo equilátero'}, {app.optOptions.facings === 'todas' ? 'mirando hacia cada pared' : 'con tu orientación actual'}{app.sub.enabled ? ', el sub en cada punto del suelo y su fase 0°/180°' : ''}.
+				{#if app.optOptions.method === 'bayes'}
+					Simula primero unas posiciones de tu cabeza repartidas por la sala y después, una a una, donde un modelo de lo ya simulado predice que más se puede mejorar (optimización bayesiana): llega a lo mismo que la rejilla con unas 3 veces menos simulaciones.
+				{:else}
+					Prueba posiciones de tu cabeza por toda la sala con una rejilla y afina alrededor de las mejores.
+				{/if}
+				Para cada posición, los KH a {fmt(Math.max(0.8, app.listenRange[0]), 1)}–{fmt(Math.min(2, app.listenRange[1]), 1)} m (cada 10 cm) {app.optOptions.apertures === 'varias' ? 'con aperturas de 50°, 60° y 70°' : 'en triángulo equilátero'}, {app.optOptions.facings === 'todas' ? 'mirando hacia cada pared' : 'con tu orientación actual'}{app.sub.enabled ? ', el sub en cada punto del suelo y su fase 0°/180°' : ''}.
 				{#if app.sub.enabled && app.optOptions.tuneSub}Después afina el corte, el nivel y el filtro de 85 Hz del sub en las 40 mejores colocaciones.{/if}
 				Puntúa con el rango de frecuencias ({app.band[0]}–{app.band[1]} Hz) y los pesos de «Mejor posición». Las paredes, el escritorio y los objetos se respetan.
 			</p>
-			{#if opt.error}<p class="mt-1 rounded bg-red-500/10 px-2 py-1 text-red-700 dark:text-red-300">{opt.error}</p>{/if}
+			{#if opt.error}<p id="opt-error" class="mt-1 rounded bg-red-500/10 px-2 py-1 text-red-700 dark:text-red-300">{opt.error}</p>{/if}
 		</div>
 
 		{#if opt.top.length}

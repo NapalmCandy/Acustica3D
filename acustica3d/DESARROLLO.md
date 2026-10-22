@@ -15,7 +15,8 @@ npm run build        # versión estática en build/
 
 ```bash
 npm run build
-x86_64-w64-mingw32-gcc -O2 -mwindows -static -DAPP_VERSION='"0.3.0"' -o launcher/Acustica3D.exe launcher/acustica3d.c -lws2_32 -lshell32 -ladvapi32 -lwinhttp
+x86_64-w64-mingw32-windres launcher/acustica3d.rc -O coff -o launcher/acustica3d.res   # icono
+x86_64-w64-mingw32-gcc -O2 -mwindows -static -DAPP_VERSION='"0.3.0"' -o launcher/Acustica3D.exe launcher/acustica3d.c launcher/acustica3d.res -lws2_32 -lshell32 -ladvapi32 -lwinhttp -lole32
 node scripts/package.mjs 0.3.0   # dist/Acustica3D_win64.zip y .pack
 ```
 
@@ -51,7 +52,7 @@ La prueba sintética (`skp.spec.ts`) construye un `.skp` mínimo. Con `SKP_FILE=
 
 ### Validación
 
-`npx vitest run`, 17 pruebas. Las de física (más la de reciprocidad):
+`npx vitest run`, 30 pruebas. Las de física (más la de reciprocidad):
 - **Campo libre:** 0 dB ± 1 dB a 1 m.
 - **Sala rígida:** modos a menos del 2,5 % de c/2L.
 - **Inversión α↔β** coherente.
@@ -67,10 +68,21 @@ Las del mapa de posición:
 - la geometría centra el punto;
 - las cajas de los objetos giradas son correctas.
 
+Las de la búsqueda bayesiana (`bayes.spec.ts`), con una puntuación sintética de varios máximos:
+- el proceso gaussiano pasa por los puntos medidos y duda lejos de ellos;
+- los puntos de partida se reparten por la sala;
+- con 30 simulaciones llega a menos de 1 punto del máximo, mejor que una rejilla de 45 cm con más simulaciones;
+- los sitios sin colocación posible no rompen la búsqueda.
+
 Prueba de extremo a extremo en Chromium: `node testdata/e2e.mjs URL gpu|cpu`. Con `gpu` usa WebGPU emulada por software (SwiftShader) y comprueba que GPU y procesador dan el mismo mapa.
 
 
 ## Historial de cambios
+
+### v0.6
+- **Búsqueda bayesiana** en la colocación automática (`sim/bayes.ts`), ahora la opción por defecto. Un proceso gaussiano (núcleo de Matérn 5/2, hiperparámetros por verosimilitud marginal) estima la puntuación en todo el suelo a partir de las posiciones ya simuladas, y la siguiente se simula donde la mejora esperada es mayor. Empieza con unas posiciones repartidas por la sala (lejos de las paredes y entre sí). Simula `base + por m² de zona válida` posiciones según la precisión, en vez de la rejilla completa más su afinado. La rejilla sigue disponible.
+- Si el worker de la búsqueda se cae sin dar motivo, se reintenta una vez con el procesador y, si vuelve a fallar, se explica qué probar (antes solo decía «Error en la búsqueda»). Con el sub limitado a cerca de los KH, solo se simulan los sitios del sub a su alcance.
+- **Barra de tareas:** `Acustica3D.exe` lleva icono y le da a la ventana de Edge un AppUserModelID propio y los datos para volver a abrirla (este .exe, su nombre y su icono). Al fijarla a la barra de tareas, el acceso directo abre Acustica3D.exe con su icono, no Edge.
 
 ### v0.5
 - La colocación automática también ajusta el Sub8 (corte, nivel, fase y filtro de 85 Hz de los satélites) y los interruptores Bass y Low-Mid de los KH. Lo hace en dos etapas: primero la colocación y después los ajustes de las 40 mejores, probando todas las combinaciones (son pocas y no hace falta simular).

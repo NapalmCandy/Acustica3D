@@ -18,6 +18,9 @@
  * 5. El programa se llamó antes Sala3D.exe: si se arranca con ese nombre, se copia como Acustica3D.exe,
  *    abre esa copia y se cierra; la copia borra el Sala3D.exe antiguo.
  *
+ * 6. Barra de tareas: la ventana es de Edge, pero se le da la identidad de Acustica3D (ver taskbar_thread)
+ *    para que tenga su propio botón y, al fijarla, el acceso directo abra Acustica3D.exe con su icono.
+ *
  * Opción --no-browser: solo servidor, sin ventana (para pruebas).
  * Variables para pruebas: ACUSTICA3D_UPDATE_URL (otra dirección para la consulta de versiones) y
  * ACUSTICA3D_CHECK_MIN_S (segundos mínimos entre consultas pedidas desde la app; 300 por defecto).
@@ -30,6 +33,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#include <propsys.h>
 #include <winhttp.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -248,6 +252,73 @@ static int find_browser(const wchar_t *exe, const wchar_t *const *fallbacks, wch
         ExpandEnvironmentStringsW(fallbacks[i], expanded, MAX_PATH);
         if (file_exists(expanded)) { wcscpy(out, expanded); return 1; }
     }
+    return 0;
+}
+
+/* ───────────────────────── barra de tareas ───────────────────────── */
+
+/* Sin esto, Windows trata la ventana como de Edge: al fijarla a la barra de tareas el acceso directo
+ * abre Edge (sin este servidor, así que no funciona) y pierde el icono. Se le pone a la ventana un
+ * identificador propio (AppUserModelID) y los datos para volver a abrirla: este .exe, su nombre y su
+ * icono. Edge puede volver a poner los suyos, así que se repasan mientras la ventana siga abierta. */
+#define APP_ID L"NapalmCandy.Acustica3D"
+#define AUMID_FMTID {0x9F4C2855, 0x9F79, 0x4B39, {0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3}}
+static const PROPERTYKEY K_RELAUNCH_CMD = {AUMID_FMTID, 2};
+static const PROPERTYKEY K_RELAUNCH_ICON = {AUMID_FMTID, 3};
+static const PROPERTYKEY K_RELAUNCH_NAME = {AUMID_FMTID, 4};
+static const PROPERTYKEY K_APP_ID = {AUMID_FMTID, 5};
+static const IID IID_PropStore = {0x886D8EEB, 0x8CF2, 0x4446, {0x8D, 0x02, 0xCD, 0xBA, 0x1D, 0xBD, 0xCF, 0x99}};
+static wchar_t g_relaunch_cmd[MAX_PATH + 4], g_relaunch_icon[MAX_PATH + 4];
+
+/* Pone un texto en la propiedad si no lo tiene ya. 1 = ha cambiado. */
+static int set_prop(IPropertyStore *ps, const PROPERTYKEY *k, const wchar_t *v)
+{
+    PROPVARIANT cur;
+    PropVariantInit(&cur);
+    if (SUCCEEDED(ps->lpVtbl->GetValue(ps, k, &cur))) {
+        int same = cur.vt == VT_LPWSTR && cur.pwszVal && !wcscmp(cur.pwszVal, v);
+        PropVariantClear(&cur);
+        if (same) return 0;
+    }
+    PROPVARIANT pv;
+    PropVariantInit(&pv);
+    pv.vt = VT_LPWSTR;
+    pv.pwszVal = (LPWSTR)v; /* SetValue hace su propia copia */
+    return SUCCEEDED(ps->lpVtbl->SetValue(ps, k, &pv));
+}
+
+static BOOL CALLBACK tag_window(HWND w, LPARAM pid)
+{
+    DWORD wp = 0;
+    wchar_t cls[64];
+    GetWindowThreadProcessId(w, &wp);
+    if (wp != (DWORD)pid || !IsWindowVisible(w) || GetWindow(w, GW_OWNER)) return TRUE;
+    if (!GetClassNameW(w, cls, 64) || wcscmp(cls, L"Chrome_WidgetWin_1")) return TRUE;
+    IPropertyStore *ps = NULL;
+    if (FAILED(SHGetPropertyStoreForWindow(w, &IID_PropStore, (void **)&ps)) || !ps) return TRUE;
+    /* los datos para volver a abrirla van antes que el identificador */
+    int changed = set_prop(ps, &K_RELAUNCH_CMD, g_relaunch_cmd);
+    changed |= set_prop(ps, &K_RELAUNCH_ICON, g_relaunch_icon);
+    changed |= set_prop(ps, &K_RELAUNCH_NAME, L"Acustica3D");
+    changed |= set_prop(ps, &K_APP_ID, APP_ID);
+    if (changed) ps->lpVtbl->Commit(ps);
+    ps->lpVtbl->Release(ps);
+    return TRUE;
+}
+
+/* Repasa las ventanas del proceso del navegador hasta que se cierre: a menudo al principio (para que
+ * el botón aparezca ya con el icono de Acustica3D) y después cada segundo. */
+static DWORD WINAPI taskbar_thread(LPVOID param)
+{
+    DWORD pid = (DWORD)(ULONG_PTR)param;
+    HANDLE h = OpenProcess(SYNCHRONIZE, FALSE, pid);
+    if (!h) return 0;
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    DWORD t0 = GetTickCount();
+    do EnumWindows(tag_window, (LPARAM)pid);
+    while (WaitForSingleObject(h, GetTickCount() - t0 < 15000 ? 100 : 1000) == WAIT_TIMEOUT);
+    CoUninitialize();
+    CloseHandle(h);
     return 0;
 }
 
@@ -564,6 +635,9 @@ int main(int argc, char **argv)
     InitializeCriticalSection(&g_lock);
 
     GetModuleFileNameW(NULL, g_exe, MAX_PATH);
+    SetCurrentProcessExplicitAppUserModelID(APP_ID);
+    _snwprintf(g_relaunch_cmd, MAX_PATH + 4, L"\"%ls\"", g_exe);
+    _snwprintf(g_relaunch_icon, MAX_PATH + 4, L"%ls,0", g_exe);
     wcscpy(g_appdir, g_exe);
     wchar_t *slash = wcsrchr(g_appdir, L'\\');
     if (slash) *slash = 0;
@@ -653,6 +727,8 @@ int main(int argc, char **argv)
         if (CreateProcessW(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
             DWORD t0 = GetTickCount();
             g_browser = pi.hProcess;
+            HANDLE tb = CreateThread(NULL, 0, taskbar_thread, (LPVOID)(ULONG_PTR)pi.dwProcessId, 0, NULL);
+            if (tb) CloseHandle(tb);
             WaitForSingleObject(pi.hProcess, INFINITE);
             g_browser = NULL;
             CloseHandle(pi.hProcess);

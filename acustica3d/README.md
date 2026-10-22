@@ -8,7 +8,7 @@ Simula cómo suenan los graves en **tu sala** a partir de su modelo 3D de Sketch
 2. Descomprímelo en Documentos o en el Escritorio.
 3. Abre **`Acustica3D.exe`**.
 
-Se abre en su propia ventana y **se actualiza solo** cuando hay una versión nueva. Necesita Windows 10 u 11, con Microsoft Edge o Google Chrome instalado.
+Se abre en su propia ventana y **se actualiza solo** cuando hay una versión nueva. Puedes fijarlo a la barra de tareas (clic derecho en su icono > *Anclar a la barra de tareas*): se abre siempre con el icono de Acustica3D. Necesita Windows 10 u 11, con Microsoft Edge o Google Chrome instalado.
 
 ## Cómo se usa
 
@@ -27,6 +27,7 @@ Se abre en su propia ventana y **se actualiza solo** cuando hay una versión nue
 
 - **Mejor posición:** mapa en verde (mejor) y rojo (peor) de dónde sentarte con los altavoces donde están. Al mover la cabeza ves la curva de graves de ese punto al instante. Puedes elegir qué frecuencias cuentan, por ejemplo 40–200 Hz si tu música o tu sub no bajan más.
 - **Colocación automática:** prueba combinaciones de altavoces, sub y posición de escucha por toda la sala y te propone las mejores.
+  - Por defecto usa una **búsqueda bayesiana**: simula unos sitios repartidos por la sala y después va eligiendo dónde simular según lo que ya ha visto, así que termina antes que recorriendo la sala entera (también puedes elegir la rejilla completa).
   - También ajusta el sub (corte, nivel, fase y filtro de 85 Hz) y los interruptores Bass y Low-Mid de los KH 120 A.
   - Te dice cuánto ganarías sin mover nada, solo con esos ajustes.
   - Con un clic lo coloca y lo ajusta todo así.

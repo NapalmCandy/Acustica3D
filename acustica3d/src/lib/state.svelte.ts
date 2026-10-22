@@ -115,7 +115,8 @@ class AppState {
 	opt = $state.raw<OptState>(emptyOpt());
 	optOptions = $state({
 		facings: 'todas' as 'todas' | 'actual', sub: 'cualquiera' as 'cualquiera' | 'cerca', precision: 'normal' as 'rapida' | 'normal' | 'fina',
-		apertures: 'varias' as 'varias' | 'equilatero', tuneSub: true, tuneKh: true
+		apertures: 'varias' as 'varias' | 'equilatero', tuneSub: true, tuneKh: true,
+		method: 'bayes' as 'bayes' | 'rejilla'
 	});
 	/** celda del mapa bajo el ratón (vista previa de su respuesta), −1 = ninguna */
 	hoverCell = $state(-1);

@@ -9,6 +9,7 @@ import { goertzel } from '../dsp/analysis';
 import type { Cx } from '../acoustics/speakers';
 import { wallCriteria, type PlaneSpectra, type Criterion } from '../analysis/score';
 import { khPair, acousticParts, totalScore, GainCache, tuneSettings, type PointTF, type OptConfig, type Settings } from './optimize';
+import { bayesSearch, type P2 } from './bayes';
 
 export interface LevelSpec {
 	fmax: number;
@@ -93,6 +94,10 @@ export interface OptRequest {
 	subMaxDist: number | null;
 	/** separación de la rejilla gruesa de posiciones del oyente (m) */
 	step: number;
+	/** rejilla: recorre la sala y afina alrededor de los mejores; bayes: elige cada posición que simular
+	 *  según lo aprendido de las anteriores (bayes.ts), con `base + perM2 · m² de zona válida` simulaciones */
+	method: 'rejilla' | 'bayes';
+	bayes: { base: number; perM2: number; max: number };
 	current: { listener: V3; khL: V3; khR: V3; sub: V3 | null };
 }
 
@@ -138,6 +143,12 @@ let planes: Record<string, NonNullable<RunOutput['plane']>> = {};
 let pulseInfo: { pulse: Float32Array; fs: number; K: number } | null = null;
 
 const post = (m: WorkerMsg, transfer: Transferable[] = []) => (self as unknown as Worker).postMessage(m, transfer);
+
+// lo que se escape (también promesas sin capturar) llega al hilo principal con su mensaje
+self.addEventListener('unhandledrejection', (ev) => {
+	const e = (ev as PromiseRejectionEvent).reason;
+	post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
+});
 
 self.onmessage = (ev: MessageEvent<RunRequest | MapRequest | FramesRequest | OptRequest>) => {
 	const msg = ev.data;
@@ -451,15 +462,23 @@ async function doOptimize(r: OptRequest) {
 			}
 		if (r.current.sub && airAt(r.current.sub)) subCands.push(r.current.sub);
 	}
-	// rejilla gruesa de posiciones del oyente (cabeza a ≥ 0,5 m de cualquier pared)
-	const grid1: V3[] = [];
-	for (let x = grid.origin[0] + r.step / 2; x < grid.origin[0] + grid.nx * dx; x += r.step)
-		for (let z = grid.origin[2] + r.step / 2; z < grid.origin[2] + grid.nz * dx; z += r.step) {
-			const p: V3 = [x, r.listenerY, z];
-			if (clear(p, 0.5)) grid1.push(p);
-		}
+	// posiciones del oyente (cabeza a ≥ 0,5 m de cualquier pared): rejilla gruesa o, para la búsqueda
+	// bayesiana, todos los sitios posibles cada 10 cm
+	const listenerGrid = (h: number, off: number) => {
+		const out: V3[] = [];
+		for (let x = grid.origin[0] + off; x < grid.origin[0] + grid.nx * dx; x += h)
+			for (let z = grid.origin[2] + off; z < grid.origin[2] + grid.nz * dx; z += h) {
+				const p: V3 = [x, r.listenerY, z];
+				if (clear(p, 0.5)) out.push(p);
+			}
+		return out;
+	};
+	const BAYES_H = 0.1;
+	const grid1 = r.method === 'rejilla' ? listenerGrid(r.step, r.step / 2) : [];
+	const bayesCands: P2[] = r.method === 'bayes' ? listenerGrid(BAYES_H, BAYES_H / 2).map((p) => [p[0], p[2]]) : [];
+	const budget = Math.min(bayesCands.length, r.bayes.max, Math.round(r.bayes.base + r.bayes.perM2 * bayesCands.length * BAYES_H * BAYES_H));
 	const refineN = 3 * 8 + 8;
-	let total = 1 + grid1.length + refineN + (r.tune.length ? 1 : 0);
+	let total = 1 + (r.method === 'bayes' ? budget : grid1.length + refineN) + (r.tune.length ? 1 : 0);
 	const gc = new GainCache(r.freqs, r.subDelayMs);
 
 	// motor
@@ -510,8 +529,12 @@ async function doOptimize(r: OptRequest) {
 				}
 		const receivers: V3[] = [];
 		for (const p of pairs) receivers.push(p.khL, p.khR);
+		// con el sub limitado a cerca de los KH, solo hacen falta los sitios a su alcance desde aquí
+		const maxDist = Math.max(...r.distances);
+		const reach = r.subMaxDist === null ? Infinity : maxDist + r.subMaxDist + 0.05;
+		const subHere = subCands.filter((s) => Math.hypot(s[0] - P[0], s[2] - P[2]) <= reach);
 		const subBase = receivers.length;
-		receivers.push(...subCands);
+		receivers.push(...subHere);
 		const extraBase = receivers.length;
 		if (extra) receivers.push(extra.khL, extra.khR, ...(extra.sub ? [extra.sub] : []));
 		if (!pairs.length && !extra) return null;
@@ -552,7 +575,7 @@ async function doOptimize(r: OptRequest) {
 		const here: Cand[] = [];
 		pairs.forEach((p, i) => {
 			const mid = [(p.khL[0] + p.khR[0]) / 2, (p.khL[2] + p.khR[2]) / 2];
-			const subs = subCands
+			const subs = subHere
 				.map((pos, j) => ({ pos, tf: tfs[subBase + j] }))
 				.filter(({ pos }) => (r.subMaxDist === null || Math.hypot(pos[0] - mid[0], pos[2] - mid[1]) <= r.subMaxDist) && Math.hypot(pos[0] - P[0], pos[2] - P[2]) >= 0.4);
 			here.push(score(p.facing, p.dist, p.aperture, p.khL, p.khR, tfs[2 * i], tfs[2 * i + 1], subs, pols));
@@ -572,11 +595,12 @@ async function doOptimize(r: OptRequest) {
 		return here[0] ?? null;
 	}
 
-	async function test(P: V3, extra?: OptRequest['current']) {
+	/** Simula una posición de escucha; devuelve su mejor puntuación (null si no cabe ninguna colocación). */
+	async function test(P: V3, extra?: OptRequest['current']): Promise<number | null> {
 		const k = key(P);
 		if (testedKeys.has(k) && !extra) {
 			done++;
-			return;
+			return tested.find((t) => key(t.pos) === k)?.score ?? null;
 		}
 		testedKeys.add(k);
 		step(P, 0);
@@ -585,26 +609,46 @@ async function doOptimize(r: OptRequest) {
 		done++;
 		step(null, 1);
 		await new Promise((res) => setTimeout(res, 0));
+		return b ? b.score : null;
 	}
 
 	// 0) la colocación actual (para comparar)
-	await test([r.current.listener[0], r.listenerY, r.current.listener[2]], r.current);
-	// 1) rejilla gruesa
-	phase = 'Fase 1 de 3: recorriendo la sala';
-	for (const P of grid1) await test(P);
-	// 2) y 3) afinado alrededor de los mejores
-	const around = async (centers: V3[], d: number) => {
-		for (const c of centers)
-			for (const [ox, oz] of [[-d, 0], [d, 0], [0, -d], [0, d], [-d, -d], [d, -d], [-d, d], [d, d]]) {
-				const P: V3 = [c[0] + ox, r.listenerY, c[2] + oz];
-				if (clear(P, 0.5)) await test(P);
-				else done++;
+	const curP: V3 = [r.current.listener[0], r.listenerY, r.current.listener[2]];
+	const curScore = await test(curP, r.current);
+	if (r.method === 'bayes') {
+		// 1) unas posiciones repartidas por la sala y 2) cada siguiente donde más se espera mejorar
+		phase = 'Fase 1 de 2: repartiendo las primeras posiciones por la sala';
+		await bayesSearch(
+			bayesCands,
+			async ([x, z], ph) => {
+				if (ph === 'bayes') phase = 'Fase 2 de 2: búsqueda bayesiana (simula donde más se espera mejorar)';
+				return test([x, r.listenerY, z]);
+			},
+			{
+				budget,
+				nInit: Math.max(6, Math.round(0.4 * budget)),
+				// tu posición actual también enseña algo al modelo (si está en la zona válida)
+				taken: curScore !== null && clear(curP, 0.5) ? [{ p: [curP[0], curP[2]], y: curScore }] : []
 			}
-	};
-	phase = 'Fase 2 de 3: afinando alrededor de los 3 mejores sitios';
-	await around(top().slice(0, 3).map((c) => c.listener), Math.min(0.2, r.step / 2));
-	phase = 'Fase 3 de 3: ajuste fino del mejor';
-	await around(top().slice(0, 1).map((c) => c.listener), Math.min(0.1, r.step / 4));
+		);
+	} else {
+		// 1) rejilla gruesa
+		phase = 'Fase 1 de 3: recorriendo la sala';
+		for (const P of grid1) await test(P);
+		// 2) y 3) afinado alrededor de los mejores
+		const around = async (centers: V3[], d: number) => {
+			for (const c of centers)
+				for (const [ox, oz] of [[-d, 0], [d, 0], [0, -d], [0, d], [-d, -d], [d, -d], [-d, d], [d, d]]) {
+					const P: V3 = [c[0] + ox, r.listenerY, c[2] + oz];
+					if (clear(P, 0.5)) await test(P);
+					else done++;
+				}
+		};
+		phase = 'Fase 2 de 3: afinando alrededor de los 3 mejores sitios';
+		await around(top().slice(0, 3).map((c) => c.listener), Math.min(0.2, r.step / 2));
+		phase = 'Fase 3 de 3: ajuste fino del mejor';
+		await around(top().slice(0, 1).map((c) => c.listener), Math.min(0.1, r.step / 4));
+	}
 	if (ctx) destroyGrid(ctx);
 	// 4) ajustes del sub sobre las 40 mejores colocaciones (sin simular: solo filtros)
 	if (r.tune.length) {

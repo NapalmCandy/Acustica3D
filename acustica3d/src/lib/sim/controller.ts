@@ -196,14 +196,17 @@ export { cmul };
 // ── Colocación automática ─────────────────────────────────────────────────────────
 let optWorker: Worker | null = null;
 
+/** ppw y rejilla de cada precisión; `bayes`: cuántas posiciones simula la búsqueda bayesiana
+ *  (base + por m² de zona válida, con un máximo). Con la sala de prueba simula ~1/3 que la rejilla. */
 const PRECISION = {
-	rapida: { ppw: 7, step: 0.6 },
-	normal: { ppw: 8, step: 0.45 },
-	fina: { ppw: 10, step: 0.3 }
+	rapida: { ppw: 7, step: 0.6, bayes: { base: 10, perM2: 1, max: 40 } },
+	normal: { ppw: 8, step: 0.45, bayes: { base: 14, perM2: 1.6, max: 60 } },
+	fina: { ppw: 10, step: 0.3, bayes: { base: 18, perM2: 2.4, max: 90 } }
 } as const;
 
-/** Lanza la búsqueda de la mejor colocación (en un worker aparte: no toca la simulación normal). */
-export function runOptimize() {
+/** Lanza la búsqueda de la mejor colocación (en un worker aparte: no toca la simulación normal).
+ *  `retry`: segundo intento tras caerse el worker sin dar motivo (va con el procesador). */
+export function runOptimize(retry = false) {
 	cancelOptimize();
 	const inp = app.simInput();
 	const P = app.snapshotPositions();
@@ -232,15 +235,15 @@ export function runOptimize() {
 	for (let d = Math.max(0.8, app.listenRange[0]); d <= Math.min(2.0, app.listenRange[1]) + 1e-6; d += 0.1) distances.push(Math.round(d * 100) / 100);
 	const req: OptRequest = {
 		type: 'optimize', tris: inp.tris, triMat: inp.triMat, betaByMat: inp.betaByMat, seed: inp.seed,
-		fmax, ppw: prec.ppw, durationS: 1.0, engine: app.engine, tLate: 0.12,
+		fmax, ppw: prec.ppw, durationS: 1.0, engine: retry ? 'cpu' : app.engine, tLate: 0.12,
 		listenerY: P.listener[1], khY: P.khL[1], subY: P.sub[1], subEnabled: app.sub.enabled,
 		freqs, start, tune, subDelayMs: sub.extraDelayMs ?? 0, weights: plain(app.weights), distances,
 		apertures: o.apertures === 'varias' ? [50, 60, 70] : [60],
 		facings: o.facings === 'todas' ? [0, 90, 180, 270] : [curFacing],
-		subMaxDist: o.sub === 'cerca' ? 1.5 : null, step: prec.step,
+		subMaxDist: o.sub === 'cerca' ? 1.5 : null, step: prec.step, method: o.method, bayes: { ...prec.bayes },
 		current: { listener: P.listener, khL: P.khL, khR: P.khR, sub: app.sub.enabled ? P.sub : null }
 	};
-	app.opt = { ...emptyOpt(), running: true, phase: 'Preparando la sala' };
+	app.opt = { ...emptyOpt(), running: true, phase: retry ? 'Se cortó el cálculo: reintentando con el procesador' : 'Preparando la sala' };
 	optWorker = new SimWorker();
 	optWorker.onmessage = (ev: MessageEvent<WorkerMsg>) => {
 		const m = ev.data;
@@ -252,7 +255,22 @@ export function runOptimize() {
 			optWorker = null;
 		} else if (m.type === 'error') app.opt = { ...app.opt, running: false, error: m.message };
 	};
-	optWorker.onerror = (e) => (app.opt = { ...app.opt, running: false, error: e.message || 'Error en la búsqueda' });
+	optWorker.onerror = (e) => {
+		e.preventDefault();
+		if (e.message) {
+			app.opt = { ...app.opt, running: false, error: e.message };
+			return;
+		}
+		// sin mensaje: el worker no llegó a arrancar o el navegador lo cortó (falta de memoria, la tarjeta
+		// gráfica se reinició…). Se reintenta una vez, con el procesador.
+		optWorker?.terminate();
+		optWorker = null;
+		if (!retry) return runOptimize(true);
+		app.opt = {
+			...app.opt, running: false,
+			error: 'El navegador cortó la búsqueda sin dar motivo (suele ser falta de memoria o un reinicio de la tarjeta gráfica). Prueba con Precisión «Normal» o cierra otras pestañas y programas.'
+		};
+	};
 	optWorker.postMessage(req, [req.tris.buffer, req.triMat.buffer]);
 }
 
