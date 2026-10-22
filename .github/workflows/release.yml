@@ -1,0 +1,75 @@
+# Publica una versión de Sala3D cuando cambia "version" en sala3d/package.json en main
+# (o a mano desde la pestaña Actions): pruebas → compilación web → Sala3D.exe (MinGW) →
+# release vX.Y.Z con el .zip (descarga manual) y el .pack (lo usa el actualizador de Sala3D.exe).
+# Si ya existe la release de esa versión, no hace nada.
+name: Publicar versión de Sala3D
+
+on:
+  push:
+    branches: [main]
+    paths: ['sala3d/package.json']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sala3d
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Versión de package.json
+        id: ver
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "La release v$VERSION ya existe: nada que publicar."
+            echo "nueva=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "nueva=si" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.ver.outputs.nueva == 'si'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sala3d/package-lock.json
+
+      - name: Compilador para Windows
+        if: steps.ver.outputs.nueva == 'si'
+        run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64 zip
+
+      - name: Pruebas y compilación web
+        if: steps.ver.outputs.nueva == 'si'
+        run: |
+          npm ci
+          npx svelte-kit sync
+          npx svelte-check --threshold error
+          npx vitest run
+          npm run build
+
+      - name: Sala3D.exe y paquetes
+        if: steps.ver.outputs.nueva == 'si'
+        run: |
+          x86_64-w64-mingw32-gcc -O2 -Wall -mwindows -static -DAPP_VERSION="\"$VERSION\"" \
+            -o launcher/Sala3D.exe launcher/sala3d_server.c -lws2_32 -lshell32 -ladvapi32 -lwinhttp
+          node scripts/package.mjs "$VERSION"
+
+      - uses: softprops/action-gh-release@v2
+        if: steps.ver.outputs.nueva == 'si'
+        with:
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: Sala3D ${{ env.VERSION }}
+          generate_release_notes: true
+          files: |
+            sala3d/dist/Sala3D_win64.zip
+            sala3d/dist/Sala3D_win64.pack

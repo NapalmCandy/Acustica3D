@@ -1,0 +1,34 @@
+# =====================================================================
+#  Neumann KH 120 A – corrección FIR  *** PROVISIONAL ***
+#  Hecha con un modelo calibrado con datos publicados, SIN medidas propias.
+#  Se sustituirá por la versión definitiva cuando haya medidas con REW.
+#
+#  Instalación:
+#   1. Copia los .wav de "filtros" a  C:\Program Files\EqualizerAPO\config\
+#   2. Copia este fichero a esa misma carpeta y añade al final de config.txt:
+#         Include: KH120A_config.txt
+#   3. Pon Windows y Focusrite Control a 48000 Hz (o usa los ficheros _44k1
+#      si trabajas a 44100 Hz). LA FRECUENCIA DEL WAV DEBE COINCIDIR.
+#
+#  Deja activa UNA SOLA línea "Convolution". La atenuación previa ya va
+#  dentro de cada WAV: todos suenan 12 dB más bajos en banda media, para que
+#  un bombo recortado a 0 dBFS no sature el DAC después del filtro. No hay
+#  saltos de nivel al cambiar entre filtros. Por eso Preamp = 0.
+# =====================================================================
+Preamp: 0 dB
+
+# --- Escucha y mezcla (fase lineal, 85 ms de latencia a 48 kHz) -------------
+Convolution: KH120A_PROVISIONAL_LIN50_faselineal_48k.wav
+
+# --- Vídeo, juegos, grabación (baja latencia, 1 ms) ------------------------
+# Convolution: KH120A_PROVISIONAL_LIN50_bajalatencia_48k.wav
+
+# --- Grave extendido a 40 Hz: SOLO a volumen moderado (<= 85 dB por caja a 1 m) ---
+# Convolution: KH120A_PROVISIONAL_EXT40_faselineal_48k.wav
+# Convolution: KH120A_PROVISIONAL_EXT40_bajalatencia_48k.wav
+
+# --- Versiones a 44,1 kHz ----------------------------------------------------
+# Convolution: KH120A_PROVISIONAL_LIN50_faselineal_44k1.wav
+# Convolution: KH120A_PROVISIONAL_LIN50_bajalatencia_44k1.wav
+# Convolution: KH120A_PROVISIONAL_EXT40_faselineal_44k1.wav
+# Convolution: KH120A_PROVISIONAL_EXT40_bajalatencia_44k1.wav

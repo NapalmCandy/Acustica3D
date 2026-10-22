@@ -1,0 +1,28 @@
+OK    44100 LIN50 faselineal: igual a la convolución de referencia error -131.4 dB · latencia 4192 muestras = 95.1 ms
+OK    44100 LIN50 bajalatencia: igual a la convolución de referencia error -128.4 dB · latencia 140 muestras = 3.2 ms
+OK    44100 EXT40 faselineal: igual a la convolución de referencia error -131.3 dB · latencia 4192 muestras = 95.1 ms
+OK    44100 EXT40 bajalatencia: igual a la convolución de referencia error -128.4 dB · latencia 140 muestras = 3.2 ms
+OK    48000 LIN50 faselineal: igual a la convolución de referencia error -131.2 dB · latencia 4192 muestras = 87.3 ms
+OK    48000 LIN50 bajalatencia: igual a la convolución de referencia error -128.6 dB · latencia 144 muestras = 3.0 ms
+OK    48000 EXT40 faselineal: igual a la convolución de referencia error -131.2 dB · latencia 4192 muestras = 87.3 ms
+OK    48000 EXT40 bajalatencia: igual a la convolución de referencia error -128.3 dB · latencia 144 muestras = 3.0 ms
+OK    88200 LIN50 faselineal: igual a la convolución de referencia error -131.3 dB · latencia 8384 muestras = 95.1 ms
+OK    88200 LIN50 bajalatencia: igual a la convolución de referencia error -128.8 dB · latencia 280 muestras = 3.2 ms
+OK    88200 EXT40 faselineal: igual a la convolución de referencia error -131.1 dB · latencia 8384 muestras = 95.1 ms
+OK    88200 EXT40 bajalatencia: igual a la convolución de referencia error -128.3 dB · latencia 280 muestras = 3.2 ms
+OK    96000 LIN50 faselineal: igual a la convolución de referencia error -131.3 dB · latencia 8384 muestras = 87.3 ms
+OK    96000 LIN50 bajalatencia: igual a la convolución de referencia error -128.8 dB · latencia 288 muestras = 3.0 ms
+OK    96000 EXT40 faselineal: igual a la convolución de referencia error -131.3 dB · latencia 8384 muestras = 87.3 ms
+OK    96000 EXT40 bajalatencia: igual a la convolución de referencia error -128.3 dB · latencia 288 muestras = 3.0 ms
+OK    bypass seguro = entrada × -12 dB, alineada error máx 0.00e+00
+OK    limitador: +6 dBFS de salida queda <= -0,5 dBFS pico -0.50 dBFS
+OK    sin limitador: tope duro de seguridad en 0,999 pico 0.9990
+OK    NaN/Inf en la entrada: salida finita 
+OK    32 kHz (no soportada): paso a -12 dB -12.00 dB
+OK    CPU fase lineal: 60 s de audio en 0.45 s ≈ 0.7 % de un núcleo (incluye la sobrecarga de Python)
+OK    CPU baja latencia: 60 s de audio en 0.81 s ≈ 1.4 % de un núcleo (incluye la sobrecarga de Python)
+OK    cambios en caliente: el pico nunca supera el nivel estable más alto en más de 0,5 dB pico -17.88 dBFS, estable -18.02 dBFS
+OK    cambios en caliente: sin escalones (chasquidos) salto máx 0.0018 frente a 0.0017 en régimen
+OK    cambios en caliente: salida finita 
+
+RESULTADO FINAL: TODO OK

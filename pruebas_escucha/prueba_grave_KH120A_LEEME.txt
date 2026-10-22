@@ -1,0 +1,13 @@
+Archivo de prueba (48 kHz, estéreo, sin compresión)
+
+    0 s -    5 s : tono de 100 Hz a -18 dBFS
+    6 s -   11 s : tono de 50 Hz a -18 dBFS
+   12 s -   17 s : tono de 45 Hz a -18 dBFS
+   18 s -   23 s : tono de 40 Hz a -18 dBFS
+   24 s -   29 s : tono de 35 Hz a -18 dBFS
+
+Compara con 'Bypass seguro' activado y desactivado (mismo volumen):
+- con EXT40: a 50, 45, 40 y 35 Hz el plugin suena claramente MÁS fuerte (+3 a +6 dB)
+- con LIN50: a 35 Hz suena claramente MÁS FLOJO (-5 dB; es la protección subsónica), a 40 Hz algo más flojo (-2 dB)
+- a 100 Hz casi igual (-0,7 dB)
+Hazlo con el Sub8 APAGADO y a volumen moderado.

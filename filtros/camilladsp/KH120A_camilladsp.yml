@@ -1,0 +1,28 @@
+# Neumann KH 120 A – CamillaDSP (Mac/Linux) – FIR PROVISIONAL
+# Formato de CamillaDSP 3.x
+# Mac: dispositivo virtual BlackHole 2ch como salida del sistema -> CamillaDSP -> interfaz.
+# Linux: bucle ALSA (snd-aloop) o PipeWire -> CamillaDSP -> interfaz.
+devices:
+  samplerate: 48000
+  chunksize: 1024
+  capture:
+    type: CoreAudio          # Linux: Alsa
+    channels: 2
+    device: "BlackHole 2ch"  # Linux: "hw:Loopback,1"
+    format: FLOAT32LE
+  playback:
+    type: CoreAudio          # Linux: Alsa
+    channels: 2
+    device: "Scarlett 2i2 USB"
+    format: FLOAT32LE
+filters:
+  kh120a:
+    type: Conv
+    parameters:
+      type: Wav
+      filename: /ruta/a/KH120A_PROVISIONAL_LIN50_faselineal_48k.wav
+      channel: 0
+pipeline:
+  - type: Filter
+    channels: [0, 1]
+    names: [kh120a]

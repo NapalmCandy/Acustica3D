@@ -1,0 +1,130 @@
+{
+ "LIN50_44100": {
+  "N_FL": 8192,
+  "lat_FL": 4096,
+  "N_BL": 16384,
+  "lat_BL": 44,
+  "peor_cuadrada_FL_dBFS": -4.216734382780212,
+  "peor_cuadrada_BL_dBFS": -2.155218346828158,
+  "err_trunc": {
+   "N": 8192,
+   "latencia_ms": 92.87981859410431,
+   "err_mag_dB": 0.005925818623884042,
+   "err_fase_grados": 0.024113765978054043,
+   "err_mag_dB_desde20Hz": 0.006509127102199664,
+   "energia_fuera_pct": 3.201862666113442e-05
+  }
+ },
+ "EXT40_44100": {
+  "N_FL": 8192,
+  "lat_FL": 4096,
+  "N_BL": 16384,
+  "lat_BL": 44,
+  "peor_cuadrada_FL_dBFS": -2.418203298563144,
+  "peor_cuadrada_BL_dBFS": -0.7636208485858144,
+  "err_trunc": {
+   "N": 8192,
+   "latencia_ms": 92.87981859410431,
+   "err_mag_dB": 0.0027973863021820955,
+   "err_fase_grados": 0.017919039655069195,
+   "err_mag_dB_desde20Hz": 0.004329161658632338,
+   "energia_fuera_pct": 3.236490102587197e-05
+  }
+ },
+ "LIN50_48000": {
+  "N_FL": 8192,
+  "lat_FL": 4096,
+  "N_BL": 16384,
+  "lat_BL": 48,
+  "peor_cuadrada_FL_dBFS": -4.1999231810004165,
+  "peor_cuadrada_BL_dBFS": -2.113577912799542,
+  "err_trunc": {
+   "N": 8192,
+   "latencia_ms": 85.33333333333333,
+   "err_mag_dB": 0.01017822048705725,
+   "err_fase_grados": 0.047490178130183525,
+   "err_mag_dB_desde20Hz": 0.010704859183592898,
+   "energia_fuera_pct": 0.0002567897025351762
+  }
+ },
+ "EXT40_48000": {
+  "N_FL": 8192,
+  "lat_FL": 4096,
+  "N_BL": 16384,
+  "lat_BL": 48,
+  "peor_cuadrada_FL_dBFS": -2.4239580964189833,
+  "peor_cuadrada_BL_dBFS": -0.7489366412719436,
+  "err_trunc": {
+   "N": 8192,
+   "latencia_ms": 85.33333333333333,
+   "err_mag_dB": 0.006256230800879444,
+   "err_fase_grados": 0.03572297171293556,
+   "err_mag_dB_desde20Hz": 0.008140496359539319,
+   "energia_fuera_pct": 0.0002564793946224775
+  }
+ },
+ "LIN50_88200": {
+  "N_FL": 16384,
+  "lat_FL": 8192,
+  "N_BL": 32768,
+  "lat_BL": 88,
+  "peor_cuadrada_FL_dBFS": -4.193275766395992,
+  "peor_cuadrada_BL_dBFS": -2.0669581533342556,
+  "err_trunc": {
+   "N": 16384,
+   "latencia_ms": 92.87981859410431,
+   "err_mag_dB": 0.005925246229313511,
+   "err_fase_grados": 0.024169661914830384,
+   "err_mag_dB_desde20Hz": 0.006524356175711416,
+   "energia_fuera_pct": 0.0020643584467849863
+  }
+ },
+ "EXT40_88200": {
+  "N_FL": 16384,
+  "lat_FL": 8192,
+  "N_BL": 32768,
+  "lat_BL": 88,
+  "peor_cuadrada_FL_dBFS": -2.339494250712305,
+  "peor_cuadrada_BL_dBFS": -0.7107681556021893,
+  "err_trunc": {
+   "N": 16384,
+   "latencia_ms": 92.87981859410431,
+   "err_mag_dB": 0.002803595226055937,
+   "err_fase_grados": 0.017863086904737664,
+   "err_mag_dB_desde20Hz": 0.00437124286913813,
+   "energia_fuera_pct": 0.002061274190345852
+  }
+ },
+ "LIN50_96000": {
+  "N_FL": 16384,
+  "lat_FL": 8192,
+  "N_BL": 32768,
+  "lat_BL": 96,
+  "peor_cuadrada_FL_dBFS": -4.189340407681648,
+  "peor_cuadrada_BL_dBFS": -2.134976787180712,
+  "err_trunc": {
+   "N": 16384,
+   "latencia_ms": 85.33333333333333,
+   "err_mag_dB": 0.010137313781573053,
+   "err_fase_grados": 0.04742303000381044,
+   "err_mag_dB_desde20Hz": 0.010759143571350818,
+   "energia_fuera_pct": 0.0019581155293879604
+  }
+ },
+ "EXT40_96000": {
+  "N_FL": 16384,
+  "lat_FL": 8192,
+  "N_BL": 32768,
+  "lat_BL": 96,
+  "peor_cuadrada_FL_dBFS": -2.3816452663178787,
+  "peor_cuadrada_BL_dBFS": -0.7564988921989511,
+  "err_trunc": {
+   "N": 16384,
+   "latencia_ms": 85.33333333333333,
+   "err_mag_dB": 0.0062445956626988545,
+   "err_fase_grados": 0.03572055318081424,
+   "err_mag_dB_desde20Hz": 0.008221798442773098,
+   "energia_fuera_pct": 0.001955447518209308
+  }
+ }
+}

@@ -1,0 +1,21 @@
+# dependencias y compilados
+node_modules/
+sala3d/.svelte-kit/
+sala3d/build/
+sala3d/dist/
+sala3d/artifact/
+sala3d/launcher/Sala3D.exe
+sala3d/testdata/capturas/
+plugin/build/
+plugin/build-win/
+plugin/bin/
+plugin/bin-win/
+plugin/dist/
+__pycache__/
+*.pyc
+
+# paquetes y registros
+*.zip
+*.log
+.DS_Store
+Thumbs.db
