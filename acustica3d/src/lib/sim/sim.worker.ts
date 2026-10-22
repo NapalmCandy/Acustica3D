@@ -25,7 +25,8 @@ export interface RunRequest {
 	betaByMat: number[];
 	levels: LevelSpec[];
 	ppw: number;
-	seed: V3;
+	/** un punto del aire de la sala, o varios por preferencia (ver voxelize) */
+	seed: V3 | V3[];
 	sources: { id: string; pos: V3 }[];
 	receivers: V3[];
 	planeY: number;
@@ -73,7 +74,8 @@ export interface OptRequest {
 	tris: Float32Array;
 	triMat: Int32Array;
 	betaByMat: number[];
-	seed: V3;
+	/** un punto del aire de la sala, o varios por preferencia (ver voxelize) */
+	seed: V3 | V3[];
 	fmax: number;
 	ppw: number;
 	durationS: number;

@@ -213,7 +213,8 @@ class AppState {
 		this.kh = Object.assign({ satHpf85: false, bassDb: 0, lowMidDb: 0, trebleDb: 0 }, p.kh);
 		this.sub = p.sub;
 		this.sim = p.sim;
-		if (p.objects) this.objects = p.objects;
+		// un proyecto sin objetos (p. ej. de antes de reconocer las trampas del .skp) no borra los del modelo
+		if (p.objects?.length) this.objects = p.objects;
 		if (p.weights) this.weights = { ...DEFAULT_WEIGHTS, ...p.weights };
 		if (p.band) this.band = p.band;
 		if (p.listenRange) this.listenRange = p.listenRange;
@@ -256,7 +257,9 @@ class AppState {
 			// para mover los objetos en la colocación automática: la sala fija va primero
 			nStatic: this.tris.materials.length, objects: objs, objMat: objs.map((o) => names.indexOf(objectMaterialName(o))),
 			fmax: this.sim.fmax, ppw: this.sim.ppw, durationS: this.sim.durationS,
-			seed: L, sources, receivers, planeY: L[1]
+			// el aire de la sala se busca desde la cabeza; si está dentro de algo dibujado, desde los KH o el centro
+			seed: [L, pos.khL, pos.khR, ...(this.bbox ? [[0, 1, 2].map((k) => (this.bbox!.min[k] + this.bbox!.max[k]) / 2) as V3] : [])],
+			sources, receivers, planeY: L[1]
 		};
 	}
 

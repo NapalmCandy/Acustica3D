@@ -27,11 +27,22 @@ function getWorker(): Worker {
 		else if (m.type === 'frames') onFrames(m);
 	};
 	worker.onerror = (e) => {
-		app.error = e.message || 'Error en el cálculo';
+		e.preventDefault();
+		if (e.message || !app.running) {
+			app.error = e.message || 'Error en el cálculo';
+			app.running = false;
+			return;
+		}
+		// sin mensaje: el navegador cortó el cálculo (falta de memoria, la tarjeta gráfica se reinició…).
+		// Se reintenta una vez con el procesador.
+		if (!simRetried) return runSimulation(true);
+		app.error =
+			'El navegador cortó el cálculo sin dar motivo (suele ser falta de memoria o un reinicio de la tarjeta gráfica). Prueba con menos frecuencia máxima o menos puntos por longitud de onda, o cierra otras pestañas y programas.';
 		app.running = false;
 	};
 	return worker;
 }
+let simRetried = false;
 
 let pendingNames: string[] = [];
 let pendingPositions: Record<DeviceId, V3> | null = null;
@@ -43,8 +54,10 @@ export function levelLadder(fmax: number, durationS: number): LevelSpec[] {
 	return [...steps.map((f) => ({ fmax: f, durationS: Math.min(durationS, 1.0) })), { fmax, durationS }];
 }
 
-/** Lanza (o relanza) la simulación progresiva. Cancela cualquier cálculo en curso. */
-export function runSimulation() {
+/** Lanza (o relanza) la simulación progresiva. Cancela cualquier cálculo en curso.
+ *  `retry`: segundo intento tras cortarse el cálculo sin dar motivo (va con el procesador). */
+export function runSimulation(retry = false) {
+	simRetried = retry;
 	app.error = null;
 	const inp = app.simInput();
 	// un worker nuevo por ejecución: cancelar = terminar el anterior
@@ -55,12 +68,12 @@ export function runSimulation() {
 	pendingPositions = app.snapshotPositions();
 	pendingReceivers = inp.receivers;
 	app.running = true;
-	app.progress = { stage: 'Preparando', frac: 0 };
+	app.progress = { stage: retry ? 'Se cortó el cálculo: reintentando con el procesador' : 'Preparando', frac: 0 };
 	const req: RunRequest = {
 		type: 'run', tris: inp.tris, triMat: inp.triMat, betaByMat: inp.betaByMat,
 		levels: levelLadder(inp.fmax, inp.durationS), ppw: inp.ppw,
 		seed: inp.seed, sources: inp.sources, receivers: inp.receivers, planeY: inp.planeY,
-		engine: app.engine, tLate: 0.12
+		engine: retry ? 'cpu' : app.engine, tLate: 0.12
 	};
 	try {
 		getWorker().postMessage(req, [req.tris.buffer, req.triMat.buffer]);

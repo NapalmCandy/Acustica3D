@@ -42,7 +42,10 @@ export function cellCenter(g: Pick<Grid, 'origin' | 'dx'>, x: number, y: number,
 	return [g.origin[0] + (x + 0.5) * g.dx, g.origin[1] + (y + 0.5) * g.dx, g.origin[2] + (z + 0.5) * g.dx];
 }
 
-export function voxelize(geo: Geometry, dx: number, seed: V3): Grid {
+/** `seed`: un punto del aire de la sala (la cabeza) o varios por orden de preferencia; si el primero
+ *  cae dentro de un objeto cerrado (una persona o un altavoz dibujados…), se usa el siguiente. */
+export function voxelize(geo: Geometry, dx: number, seed: V3 | V3[]): Grid {
+	const seeds = (Array.isArray(seed[0]) ? seed : [seed]) as V3[];
 	const T = geo.tris;
 	const nT = geo.triMat.length;
 	let mn: V3 = [Infinity, Infinity, Infinity];
@@ -58,8 +61,8 @@ export function voxelize(geo: Geometry, dx: number, seed: V3): Grid {
 	}
 	// incluir la semilla y 2 celdas de margen (la primera capa es "exterior" absorbente)
 	for (let k = 0; k < 3; k++) {
-		mn[k] = Math.min(mn[k], seed[k]) - 2 * dx;
-		mx[k] = Math.max(mx[k], seed[k]) + 2 * dx;
+		mn[k] = Math.min(mn[k], ...seeds.map((s) => s[k])) - 2 * dx;
+		mx[k] = Math.max(mx[k], ...seeds.map((s) => s[k])) + 2 * dx;
 	}
 	const nx = Math.ceil((mx[0] - mn[0]) / dx) + 1;
 	const ny = Math.ceil((mx[1] - mn[1]) / dx) + 1;
@@ -111,49 +114,65 @@ export function voxelize(geo: Geometry, dx: number, seed: V3): Grid {
 		for (let y = 0; y < ny; y++)
 			for (let x = 0; x < nx; x++)
 				if (x === 0 || y === 0 || z === 0 || x === nx - 1 || y === ny - 1 || z === nz - 1) g.solid[idx(g, x, y, z)] = 2;
-	// semilla en aire (si cae dentro de un sólido, busca la celda libre más cercana)
-	let [sx, sy, sz] = cellOf(g, seed);
-	if (g.solid[idx(g, sx, sy, sz)]) {
-		let found = false;
-		for (let r = 1; r < 6 && !found; r++)
-			for (let dz = -r; dz <= r && !found; dz++)
-				for (let dy = -r; dy <= r && !found; dy++)
-					for (let ddx = -r; ddx <= r && !found; ddx++) {
-						const i = idx(g, sx + ddx, sy + dy, sz + dz);
-						if (!g.solid[i]) {
-							sx += ddx; sy += dy; sz += dz;
-							found = true;
-						}
-					}
-		if (!found) throw new Error('La posición de escucha está dentro de un sólido del modelo.');
-	}
-	// relleno por inundación (6-conexión)
-	const stack = new Int32Array(N);
-	let sp = 0;
-	const s0 = idx(g, sx, sy, sz);
-	stack[sp++] = s0;
-	g.air[s0] = 1;
+	// relleno por inundación (6-conexión) desde una semilla; si cae dentro de un sólido, desde la celda
+	// libre más cercana. Devuelve las celdas de aire de esa región.
 	const sxy = nx * ny;
-	while (sp > 0) {
-		const i = stack[--sp];
-		g.airCells++;
-		const offs = [1, -1, nx, -nx, sxy, -sxy];
-		for (const o of offs) {
-			const j = i + o;
-			if (g.air[j]) continue;
-			if (g.solid[j] === 2) {
-				if (!g.leak) {
-					g.leak = true;
-					const x = i % nx, y = Math.floor(i / nx) % ny, z = Math.floor(i / sxy);
-					g.leakPoint = cellCenter(g, x, y, z);
-				}
-				continue;
-			}
-			if (g.solid[j]) continue;
-			g.air[j] = 1;
-			stack[sp++] = j;
+	const stack = new Int32Array(N);
+	const fill = (seedP: V3, air: Uint8Array) => {
+		let [sx, sy, sz] = cellOf(g, seedP);
+		if (g.solid[idx(g, sx, sy, sz)]) {
+			let found = false;
+			for (let r = 1; r < 6 && !found; r++)
+				for (let dz = -r; dz <= r && !found; dz++)
+					for (let dy = -r; dy <= r && !found; dy++)
+						for (let ddx = -r; ddx <= r && !found; ddx++) {
+							const i = idx(g, sx + ddx, sy + dy, sz + dz);
+							if (!g.solid[i]) {
+								sx += ddx; sy += dy; sz += dz;
+								found = true;
+							}
+						}
+			if (!found) return null;
 		}
+		let sp = 0, cells = 0;
+		let leakPoint: V3 | null = null;
+		const s0 = idx(g, sx, sy, sz);
+		stack[sp++] = s0;
+		air[s0] = 1;
+		while (sp > 0) {
+			const i = stack[--sp];
+			cells++;
+			for (const o of [1, -1, nx, -nx, sxy, -sxy]) {
+				const j = i + o;
+				if (air[j]) continue;
+				if (g.solid[j] === 2) {
+					if (!leakPoint) {
+						const x = i % nx, y = Math.floor(i / nx) % ny, z = Math.floor(i / sxy);
+						leakPoint = cellCenter(g, x, y, z);
+					}
+					continue;
+				}
+				if (g.solid[j]) continue;
+				air[j] = 1;
+				stack[sp++] = j;
+			}
+		}
+		return { cells, leakPoint, air };
+	};
+	// el aire de la sala: el de la primera semilla que no esté encerrada en un objeto (≥ 2 m³); si
+	// ninguna lo está, la región más grande
+	const MIN_CELLS = 2 / (dx * dx * dx);
+	let best: ReturnType<typeof fill> = null;
+	for (const s of seeds) {
+		const r = fill(s, best ? new Uint8Array(N) : g.air);
+		if (r && (!best || r.cells > best.cells)) best = r;
+		if (best && best.cells >= MIN_CELLS) break;
 	}
+	if (!best) throw new Error('La posición de escucha está dentro de un sólido del modelo.');
+	if (best.air !== g.air) g.air = best.air;
+	g.airCells = best.cells;
+	g.leak = !!best.leakPoint;
+	g.leakPoint = best.leakPoint;
 	refineBoundary(g, geo);
 	g.airVolume = g.airCells * dx * dx * dx;
 	return g;

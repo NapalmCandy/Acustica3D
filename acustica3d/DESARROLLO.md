@@ -79,6 +79,11 @@ Prueba de extremo a extremo en Chromium: `node testdata/e2e.mjs URL gpu|cpu`. Co
 
 ## Historial de cambios
 
+### v0.7.1
+- El aire de la sala se busca desde varias semillas (cabeza, KH, centro): si la cabeza cae dentro de algo dibujado y cerrado (una persona, un altavoz), ya no se simula solo el hueco de dentro.
+- Si el cálculo normal se corta sin dar motivo, se reintenta una vez con el procesador y, si vuelve a fallar, se explica qué probar.
+- Abrir un proyecto sin objetos ya no borra las trampas y paneles reconocidos en el .skp.
+
 ### v0.7
 - **Lo dibujado en el .skp se reconoce** (`geometry/scene.ts`, con los grupos que ahora devuelve `skp.ts`):
   - KH dibujados → se quitan de la geometría y sus posiciones (woofer: 18 cm bajo lo más alto) pasan a ser las de los KH; persona y silla → se quitan y la cabeza (ojos, 8 cm hacia atrás) es la posición de escucha; el sub va al suelo bajo el KH izquierdo; la pantalla del PC se quita.
