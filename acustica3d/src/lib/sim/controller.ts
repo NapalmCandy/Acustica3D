@@ -15,12 +15,17 @@ const mapWaiters = new Map<number, (m: Extract<WorkerMsg, { type: 'map' }>) => v
 
 function getWorker(): Worker {
 	if (worker) return worker;
-	worker = new SimWorker();
+	const w = (worker = new SimWorker());
+	let started = false;
+	const born = performance.now();
 	worker.onmessage = (ev: MessageEvent<WorkerMsg>) => {
 		const m = ev.data;
+		started = true;
+		if (m.type === 'ready') return;
 		if (m.type === 'progress') app.progress = { stage: m.stage, frac: (m.level + m.frac) / m.nLevels };
 		else if (m.type === 'error') {
-			app.error = m.message;
+			app.error = m.message.split('\n')[0];
+			app.errorDebug = `Error del cálculo: ${m.message}\nPaso: ${app.progress.stage}\nMotor pedido: ${simRetried ? 'cpu (reintento)' : app.engine}\n${navigator.userAgent}`;
 			app.running = false;
 		} else if (m.type === 'level') onLevel(m);
 		else if (m.type === 'map') mapWaiters.get(m.reqId)?.(m), mapWaiters.delete(m.reqId);
@@ -28,21 +33,65 @@ function getWorker(): Worker {
 	};
 	worker.onerror = (e) => {
 		e.preventDefault();
+		// avisos de un cálculo anterior (ya sustituido por el reintento): no cuentan
+		if (w !== worker) return;
+		const where = started ? `se cortó en «${app.progress.stage}»` : 'el programa de cálculo no llegó a arrancar';
+		console.error('Acustica3D: el cálculo', where, e.message, e.filename, e.lineno, e.error);
+		void debugReport(e, where, started, performance.now() - born);
 		if (e.message || !app.running) {
-			app.error = e.message || 'Error en el cálculo';
+			app.error = e.message || `Error en el cálculo (${where})`;
 			app.running = false;
 			return;
 		}
 		// sin mensaje: el navegador cortó el cálculo (falta de memoria, la tarjeta gráfica se reinició…).
 		// Se reintenta una vez con el procesador.
-		if (!simRetried) return runSimulation(true);
-		app.error =
-			'El navegador cortó el cálculo sin dar motivo (suele ser falta de memoria o un reinicio de la tarjeta gráfica). Prueba con menos frecuencia máxima o menos puntos por longitud de onda, o cierra otras pestañas y programas.';
+		if (!simRetried) {
+			lastCut = where;
+			return runSimulation(true);
+		}
+		app.error = `El navegador cortó el cálculo sin dar motivo: con la GPU ${lastCut} y con el procesador ${where}. Mándale esto a quien te ayuda con Acustica3D, junto con lo que diga «Motor».`;
 		app.running = false;
 	};
 	return worker;
 }
 let simRetried = false;
+let lastCut = '';
+const debugLines: string[] = [];
+
+/** Junta lo que se sabe de un corte del cálculo para poder depurarlo desde el equipo del usuario. */
+async function debugReport(e: ErrorEvent, where: string, started: boolean, ms: number) {
+	const gpu = (navigator as Navigator & { gpu?: GPU }).gpu;
+	let adapter = 'sin WebGPU';
+	if (gpu)
+		try {
+			const a = await gpu.requestAdapter({ powerPreference: 'high-performance' });
+			adapter = a ? `${a.info?.vendor ?? ''} ${a.info?.architecture ?? ''} ${a.info?.description ?? ''}`.trim() || 'WebGPU' : 'WebGPU sin adaptador';
+		} catch (err) {
+			adapter = `WebGPU con error: ${err}`;
+		}
+	// ¿se puede descargar el propio programa de cálculo?
+	let fetchInfo = '';
+	if (e.filename)
+		try {
+			const r = await fetch(e.filename, { cache: 'no-store' });
+			fetchInfo = `descarga del worker: ${r.status} ${r.headers.get('content-type')} ${(await r.text()).length} bytes`;
+		} catch (err) {
+			fetchInfo = `descarga del worker: falla (${err})`;
+		}
+	debugLines.push(
+		[
+			`[${new Date().toLocaleTimeString()}] ${where}${simRetried ? ' (reintento con el procesador)' : ''}`,
+			`  arrancó: ${started ? 'sí' : 'no'} · a los ${(ms / 1000).toFixed(1)} s · paso: ${app.progress.stage}`,
+			`  motor pedido: ${simRetried ? 'cpu' : app.engine} · GPU: ${adapter}`,
+			`  evento: ${e.constructor?.name} · mensaje: «${e.message ?? ''}» · archivo: ${e.filename || '—'}:${e.lineno ?? ''}:${e.colno ?? ''} · error: ${e.error ?? '—'}`,
+			fetchInfo ? `  ${fetchInfo}` : '',
+			`  rejilla: ${app.estimate() ? `${(app.estimate()!.cells / 1e3).toFixed(0)} mil celdas, ${app.estimate()!.steps.toFixed(0)} pasos` : '—'} · memoria del dispositivo: ${(navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? '?'} GB`
+		]
+			.filter(Boolean)
+			.join('\n')
+	);
+	app.errorDebug = `Acustica3D ${__APP_VERSION__} · ${navigator.userAgent}\n` + debugLines.join('\n');
+}
 
 let pendingNames: string[] = [];
 let pendingPositions: Record<DeviceId, V3> | null = null;
@@ -58,6 +107,7 @@ export function levelLadder(fmax: number, durationS: number): LevelSpec[] {
  *  `retry`: segundo intento tras cortarse el cálculo sin dar motivo (va con el procesador). */
 export function runSimulation(retry = false) {
 	simRetried = retry;
+	if (!retry) (app.errorDebug = null), (debugLines.length = 0);
 	app.error = null;
 	const inp = app.simInput();
 	// un worker nuevo por ejecución: cancelar = terminar el anterior
@@ -275,6 +325,7 @@ export function runOptimize(retry = false) {
 	};
 	optWorker.onerror = (e) => {
 		e.preventDefault();
+		void debugReport(e, `búsqueda: ${app.opt.footprint ? `se cortó en «${app.opt.phase}»` : 'no llegó a empezar'}`, !!app.opt.footprint, 0);
 		if (e.message) {
 			app.opt = { ...app.opt, running: false, error: e.message };
 			return;

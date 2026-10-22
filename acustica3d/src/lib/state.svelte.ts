@@ -74,7 +74,8 @@ export function guessMaterial(name: string): string {
 		[/puerta|door/, 'puerta'],
 		[/mesa|escritorio|desk|mueble|estant|armario|madera|wood|mdf/, 'madera_mueble'],
 		[/sofa|sofá|sillon|sillón|couch|cama|bed/, 'sofa'],
-		[/altavoz|speaker|neumann|monitor|pantalla|screen|logo|persona|oyente|human|silla|chair|eyeball|cota|dimension|guide|guía/, 'ignorar']
+		[/pantalla|screen|monitor ?pc|samsung|logo|televis/, 'pantalla'],
+		[/altavoz|speaker|neumann|studio ?monitor|monitor de estudio|persona|oyente|human|silla|chair|eyeball|cota|dimension|guide|guía/, 'ignorar']
 	];
 	for (const [re, id] of rules) if (re.test(n)) return id;
 	return 'pladur_trasdosado';
@@ -109,6 +110,8 @@ class AppState {
 	running = $state(false);
 	progress = $state({ stage: '', frac: 0 });
 	error = $state<string | null>(null);
+	/** datos para depurar el último fallo del cálculo (se pueden copiar) */
+	errorDebug = $state<string | null>(null);
 	result = $state.raw<SimResult | null>(null);
 	spectra = $state.raw<PlaneSpectra | null>(null);
 	level = $state<{ i: number; n: number; fmax: number; engine: string; dx: number } | null>(null);

@@ -79,6 +79,12 @@ Prueba de extremo a extremo en Chromium: `node testdata/e2e.mjs URL gpu|cpu`. Co
 
 ## Historial de cambios
 
+### v0.7.2
+- KH a la altura del punto medio entre tweeter y woofer (sacado de las rejillas dibujadas; si no, 12,5 cm bajo lo alto de la caja) y oído 5 cm por debajo y 8 cm por detrás de los ojos.
+- La pantalla del ordenador ya no se quita: material «Pantalla / plástico duro» (refleja; importa en medios y agudos).
+- Lo reconocido al importar va en un desplegable; trampas y paneles se dibujan por las dos caras.
+- Diagnóstico de fallos del cálculo: el worker avisa al cargar (`ready`), y si se corta se muestra «Datos para depurar» (si llegó a arrancar, paso, motor, GPU, evento, archivo y línea, si se puede descargar el worker). Los avisos de un worker ya sustituido por el reintento se ignoran.
+
 ### v0.7.1
 - El aire de la sala se busca desde varias semillas (cabeza, KH, centro): si la cabeza cae dentro de algo dibujado y cerrado (una persona, un altavoz), ya no se simula solo el hueco de dentro.
 - Si el cálculo normal se corta sin dar motivo, se reintenta una vez con el procesador y, si vuelve a fallar, se explica qué probar.

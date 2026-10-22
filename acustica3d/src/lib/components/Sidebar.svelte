@@ -112,7 +112,12 @@
 			<dt class="text-muted">Materiales</dt><dd class="text-ink">{app.materialNames.length}</dd>
 		</dl>
 		{#each app.warnings as w}<p class="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">⚠ {w}</p>{/each}
-		{#each app.notes as n}<p class="rounded-md bg-accent/10 px-3 py-2 text-xs text-ink">{n}</p>{/each}
+		{#if app.notes.length}
+			<details class="rounded-md bg-accent/10 px-3 py-2 text-xs text-ink">
+				<summary class="cursor-pointer select-none">Qué se ha reconocido en el modelo ({app.notes.length})</summary>
+				<ul class="mt-1.5 list-disc space-y-1 pl-4">{#each app.notes as n}<li>{n}</li>{/each}</ul>
+			</details>
+		{/if}
 	{/if}
 	<details class="text-xs text-muted">
 		<summary class="cursor-pointer">Cómo preparar el modelo en SketchUp</summary>
@@ -270,6 +275,13 @@
 	{#if app.level}<p class="text-xs text-muted">Motor: {app.level.engine}</p>{/if}
 	<p class="text-xs text-muted">Primero sale una vista previa rápida (hasta 100 Hz) y se va afinando por niveles hasta la frecuencia máxima. Si mueves algo, vuelve a empezar.</p>
 	{#if app.error}<p class="rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-300">⚠ {app.error}</p>{/if}
+	{#if app.errorDebug}
+		<details class="rounded-md border border-line px-3 py-2 text-xs" open>
+			<summary class="cursor-pointer select-none text-muted">Datos para depurar</summary>
+			<pre id="debug-info" class="mt-1.5 max-h-60 overflow-auto whitespace-pre-wrap break-all text-[10px] text-ink">{app.errorDebug}</pre>
+			<button class="btn mt-1.5 px-2 py-1 text-xs" onclick={() => navigator.clipboard?.writeText(app.errorDebug ?? '')}>Copiar</button>
+		</details>
+	{/if}
 	{#if app.result?.grid.leak}
 		<p class="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
 			⚠ La sala no está cerrada: el aire "se escapa" cerca de

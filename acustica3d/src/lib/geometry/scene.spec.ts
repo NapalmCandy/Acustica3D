@@ -40,6 +40,9 @@ function drawnRoom() {
 	const kh = group('Monitores');
 	box(group('izq', kh), [1.2, 0.9, -4.2], [1.38, 1.18, -3.99], 'Neumann Altavoz');
 	box(group('der', kh), [2.6, 0.9, -4.2], [2.78, 1.18, -3.99], 'Neumann Altavoz');
+	// rejillas del izquierdo: woofer centrado en 1,0 m y tweeter en 1,12 m
+	box(group('woofer', kh), [1.24, 0.95, -3.99], [1.34, 1.05, -3.98], 'Neumann rejilla');
+	box(group('tweeter', kh), [1.27, 1.1, -3.99], [1.31, 1.14, -3.98], 'Neumann rejilla');
 	const silla = group('Silla Estudio');
 	box(group('cuerpo', silla), [1.8, 0.5, -2.9], [2.2, 1.3, -2.6], 'Oyente');
 	box(group('ojos', silla), [1.95, 1.2, -2.95], [2.05, 1.22, -2.9], 'eyeBall');
@@ -57,13 +60,14 @@ describe('lo dibujado en el .skp', () => {
 	it('los KH dibujados pasan a ser las fuentes (izquierdo y derecho vistos desde la cabeza)', () => {
 		expect(s.devices.khL![0]).toBeCloseTo(1.29, 2);
 		expect(s.devices.khR![0]).toBeCloseTo(2.69, 2);
-		expect(s.devices.khL![1]).toBeCloseTo(1.0, 2); // woofer: 18 cm por debajo de lo más alto
+		expect(s.devices.khL![1]).toBeCloseTo(1.06, 2); // entre woofer (1,0) y tweeter (1,12)
+		expect(s.devices.khR![1]).toBeCloseTo(1.18 - 0.125, 2); // sin rejillas: como un KH 120 A
 		expect(s.tris.materials).not.toContain('Neumann Altavoz');
 	});
 
 	it('la cabeza es la posición de escucha, y la persona y su silla se quitan', () => {
 		const L = s.devices.listener!;
-		expect(L[1]).toBeCloseTo(1.21, 2);
+		expect(L[1]).toBeCloseTo(1.16, 2); // 5 cm por debajo de los ojos
 		expect(L[2]).toBeGreaterThan(-2.95); // las orejas, por detrás de los ojos (lejos de los KH)
 		for (const mat of ['Oyente', 'eyeBall', '[Color_007]']) expect(s.tris.materials).not.toContain(mat);
 		expect(s.devices.sub![1]).toBeCloseTo(0.2, 2); // en el suelo, bajo el KH izquierdo

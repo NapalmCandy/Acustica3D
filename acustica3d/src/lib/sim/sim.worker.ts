@@ -146,6 +146,7 @@ export interface LevelResult {
 export type WorkerMsg =
 	| { type: 'progress'; stage: string; frac: number; level: number; nLevels: number }
 	| { type: 'error'; message: string }
+	| { type: 'ready' }
 	| LevelResult
 	| { type: 'map'; reqId: number; values: Float32Array; ix: Int32Array; iz: Int32Array; nx: number; nz: number }
 	| FramesChunk
@@ -156,6 +157,9 @@ let pulseInfo: { pulse: Float32Array; fs: number; K: number } | null = null;
 
 const post = (m: WorkerMsg, transfer: Transferable[] = []) => (self as unknown as Worker).postMessage(m, transfer);
 
+// primer mensaje: el programa de cálculo se ha cargado (para distinguirlo de un fallo al arrancar)
+post({ type: 'ready' });
+
 // lo que se escape (también promesas sin capturar) llega al hilo principal con su mensaje
 self.addEventListener('unhandledrejection', (ev) => {
 	const e = (ev as PromiseRejectionEvent).reason;
@@ -164,7 +168,7 @@ self.addEventListener('unhandledrejection', (ev) => {
 
 self.onmessage = (ev: MessageEvent<RunRequest | MapRequest | FramesRequest | OptRequest>) => {
 	const msg = ev.data;
-	const fail = (e: unknown) => post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
+	const fail = (e: unknown) => post({ type: 'error', message: e instanceof Error ? `${e.message}${e.stack ? `\n${e.stack}` : ''}` : String(e) });
 	try {
 		if (msg.type === 'run') runLevels(msg).catch(fail);
 		else if (msg.type === 'map') doMap(msg);
@@ -305,7 +309,8 @@ async function runLevels(r: RunRequest) {
 		}
 		for (let si = 0; si < r.sources.length; si++) {
 			const s = r.sources[si];
-			const onProgress = (f: number) => prog(`Nivel ${li + 1}/${nL} (hasta ${fmax} Hz): ${s.id}`, (si + f) / r.sources.length);
+			const tag = ctx ? ' (GPU)' : '';
+			const onProgress = (f: number) => prog(`Nivel ${li + 1}/${nL} (hasta ${fmax} Hz): ${s.id}${tag}`, (si + f) / r.sources.length);
 			const args = { source: s.pos, receivers: r.receivers, durationS, fmax, planeY: r.planeY, onProgress };
 			let out: RunOutput;
 			if (ctx) {

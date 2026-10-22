@@ -149,7 +149,8 @@
 			if (!m) {
 				m = new THREE.Mesh(
 					new THREE.BoxGeometry(1, 1, 1),
-					new THREE.MeshStandardMaterial({ roughness: 0.85, transparent: true, opacity: 0.9 })
+					// por las dos caras: en los dibujos de SketchUp no todas miran hacia fuera
+					new THREE.MeshStandardMaterial({ roughness: 0.85, transparent: true, opacity: 0.9, side: THREE.DoubleSide })
 				);
 				m.name = `obj:${o.id}`;
 				m.userData.deviceId = m.name;

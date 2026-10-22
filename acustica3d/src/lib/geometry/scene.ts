@@ -26,8 +26,10 @@ export interface SceneInfo {
 const SPEAKER = /neumann|genelec|kh ?(80|120|150|310)|altavoz|speaker|studio ?monitor|monitor de estudio/i;
 const PERSON = /oyente|persona|person|human|listener|cabeza|eyeball/i;
 const EYE = /eyeball|ojo/i;
+const DRIVER = /rejilla|grill|woofer|tweeter|cono|cone|driver/i;
 const CHAIR = /silla|chair|taburete|stool/i;
 const SCREEN = /monitor ?pc|pantalla|screen|samsung|televis|\btv\b/i;
+const SCREEN_MAT = 'Pantalla del ordenador';
 const POROUS = /lana|rockwool|sonorock|absorb|fibra|panel|trampa|bass ?trap/i;
 const BOARD = /pladur|yeso|drywall|gypsum|placa|escayola/i;
 
@@ -161,13 +163,34 @@ export function analyzeScene(tris: NamedTris, parts: SkpPart[], triPart: Int32Ar
 	for (let i = 0; i < items.length; i++)
 		for (let j = 0; j < i; j++) if (touch(items[i].box, items[j].box, 0.03)) root[find(i)] = find(j);
 	const clusters = new Map<number, Box>();
+	const clusterTris = new Map<Box, number[]>();
 	for (let i = 0; i < items.length; i++) {
 		const r = find(i);
-		const b = clusters.get(r) ?? emptyBox();
+		let b = clusters.get(r);
+		if (!b) clusters.set(r, (b = emptyBox())), clusterTris.set(b, []);
 		for (const t of items[i].tris) grow(b, P, t);
-		clusters.set(r, b);
+		clusterTris.get(b)!.push(...items[i].tris);
 		for (const t of items[i].tris) removed[t] = 1;
 	}
+	/** Altura del eje acústico: el punto medio entre el tweeter y el woofer, sacado de las rejillas o los
+	 *  conos dibujados (dos grupos de alturas separados por un hueco); si no, el de un KH 120 A
+	 *  (12,5 cm por debajo de lo más alto de la caja). */
+	const axisHeight = (b: Box): number => {
+		const ys = (clusterTris.get(b) ?? [])
+			.filter((t) => DRIVER.test(tris.materials[t]))
+			.map((t) => (P[t * 9 + 1] + P[t * 9 + 4] + P[t * 9 + 7]) / 3)
+			.sort((x, y) => x - y);
+		if (ys.length >= 4) {
+			let gap = 0, at = -1;
+			for (let i = 1; i < ys.length; i++) if (ys[i] - ys[i - 1] > gap) (gap = ys[i] - ys[i - 1]), (at = i);
+			if (gap > 0.02) {
+				const lo = ys.slice(0, at), hi = ys.slice(at);
+				const mid = (a: number[]) => (a[0] + a[a.length - 1]) / 2;
+				return (mid(lo) + mid(hi)) / 2;
+			}
+		}
+		return b.hi[1] - 0.125;
+	};
 	const speakers = [...clusters.values()].filter((b) => Math.max(...size(b)) < 1.0 && Math.max(...size(b)) > 0.1);
 
 	// ── oyente: la persona (y la silla en la que está) ──
@@ -182,8 +205,9 @@ export function analyzeScene(tris: NamedTris, parts: SkpPart[], triPart: Int32Ar
 		for (const t of person) grow(pb, P, t);
 		const eb = emptyBox();
 		for (const t of eyes) grow(eb, P, t);
-		// la cabeza: a la altura de los ojos (o 12 cm por debajo de lo más alto de la persona)
-		const c = eyes.length ? center(eb) : ([(pb.lo[0] + pb.hi[0]) / 2, pb.hi[1] - 0.12, (pb.lo[2] + pb.hi[2]) / 2] as V3);
+		// el oído: 5 cm por debajo de los ojos (o 17 cm por debajo de lo más alto de la persona); más
+		// abajo se lleva también unos 8 cm hacia atrás
+		const c = eyes.length ? ([center(eb)[0], eb.lo[1] - 0.05 + (eb.hi[1] - eb.lo[1]) / 2, center(eb)[2]] as V3) : ([(pb.lo[0] + pb.hi[0]) / 2, pb.hi[1] - 0.17, (pb.lo[2] + pb.hi[2]) / 2] as V3);
 		listener = c;
 		// el grupo más pequeño que contiene a toda la persona (suele llevar también la silla)
 		let holder = -1;
@@ -198,12 +222,16 @@ export function analyzeScene(tris: NamedTris, parts: SkpPart[], triPart: Int32Ar
 		}
 		for (const t of holder >= 0 ? partTris[holder] : person) removed[t] = 1;
 	}
+	// la pantalla se queda (en medios y agudos refleja mucho) con un material propio, duro y reflectante
 	let screens = 0;
 	for (let t = 0; t < nT; t++) {
 		if (!removed[t] && flag(t, CHAIR)) removed[t] = 1;
-		if (!removed[t] && flag(t, SCREEN)) (removed[t] = 1), screens++;
+		if (!removed[t] && flag(t, SCREEN)) (newMat[t] = SCREEN_MAT), screens++;
 	}
-	if (screens) notes.push('La pantalla del ordenador se ha quitado: en graves no cuenta (es mucho más pequeña que la onda).');
+	if (screens) {
+		libHints[SCREEN_MAT] = 'pantalla';
+		notes.push(`La pantalla del ordenador se queda como «${SCREEN_MAT}» (superficie dura y reflectante): en graves apenas cuenta, pero sí en medios y agudos.`);
+	}
 
 	// izquierdo / derecho según hacia dónde mira el oyente (hacia el punto medio de los altavoces)
 	if (speakers.length >= 2) {
@@ -219,7 +247,7 @@ export function analyzeScene(tris: NamedTris, parts: SkpPart[], triPart: Int32Ar
 		const isRight = (p: V3) => (p[0] - ref[0]) * rx + (p[2] - ref[2]) * rz > 0;
 		const [a, b] = isRight(pair[0].c) ? [pair[1], pair[0]] : pair;
 		// centro acústico del KH 120 A: el woofer, ~18 cm por debajo de lo más alto de la caja
-		const acoustic = (p: { b: Box; c: V3 }): V3 => [r3(p.c[0]), r3(p.b.hi[1] - 0.18), r3(p.c[2])];
+		const acoustic = (p: { b: Box; c: V3 }): V3 => [r3(p.c[0]), r3(axisHeight(p.b)), r3(p.c[2])];
 		devices.khL = acoustic(a);
 		devices.khR = acoustic(b);
 		if (listener) {
@@ -227,11 +255,11 @@ export function analyzeScene(tris: NamedTris, parts: SkpPart[], triPart: Int32Ar
 			const d = Math.hypot(fx, fz) || 1;
 			listener = [listener[0] - (0.08 * fx) / d, listener[1], listener[2] - (0.08 * fz) / d];
 		}
-		notes.push(`Los altavoces dibujados (${speakers.length}) se han quitado de la geometría: en la simulación son fuentes. Sus posiciones son las de los KH.`);
+		notes.push(`Los altavoces dibujados (${speakers.length}) se han quitado de la geometría: en la simulación son fuentes. Sus posiciones son las de los KH, a la altura del punto medio entre tweeter y woofer.`);
 	}
 	if (listener) {
 		devices.listener = [r3(listener[0]), r3(listener[1]), r3(listener[2])];
-		notes.push('La persona y la silla dibujadas se han quitado de la geometría; tu cabeza es la posición de escucha.');
+		notes.push('La persona y la silla dibujadas se han quitado de la geometría; tu oído (5 cm por debajo y 8 cm por detrás de los ojos) es la posición de escucha.');
 	}
 
 	// ── trampas y paneles de lana sueltos: grupos enteros de material poroso y tamaño de mueble ──
