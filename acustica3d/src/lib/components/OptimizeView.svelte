@@ -3,6 +3,7 @@
 	import { runOptimize, cancelOptimize, applyConfig } from '../sim/controller';
 	import { scoreColor, SCORE_RAMP, YOU_COLOR, BEST_COLOR } from '../colors';
 	import { CRITERIA } from '../analysis/score';
+	import { KH_EQ } from '../acoustics/speakers';
 	import type { OptConfig } from '../sim/optimize';
 	import type { V3 } from '../sim/voxel';
 
@@ -12,7 +13,8 @@
 	let selected = $state(0);
 
 	const opt = $derived(app.opt);
-	const shown = $derived<OptConfig | null>(opt.top[Math.min(selected, opt.top.length - 1)] ?? null);
+	// selected = −1: tu colocación actual con los ajustes afinados
+	const shown = $derived<OptConfig | null>(selected === -1 ? opt.currentTuned : (opt.top[Math.min(selected, opt.top.length - 1)] ?? null));
 
 	$effect(() => {
 		const fp = opt.footprint;
@@ -162,6 +164,15 @@
 						<option value="rapida">Rápida</option><option value="normal">Normal</option><option value="fina">Fina (lenta)</option>
 					</select>
 				</label>
+				<label>Apertura de los KH
+					<select class="input w-full" bind:value={app.optOptions.apertures} disabled={opt.running}>
+						<option value="varias">50°, 60° y 70°</option><option value="equilatero">Solo 60° (equilátero)</option>
+					</select>
+				</label>
+				<label class="col-span-2 flex items-end gap-2 pb-1"><input type="checkbox" bind:checked={app.optOptions.tuneSub} disabled={opt.running || !app.sub.enabled} /> Ajustar el sub (corte, nivel, filtro de 85 Hz)</label>
+				{#if KH_EQ.enabled}
+					<label class="col-span-3 flex items-center gap-2"><input type="checkbox" bind:checked={app.optOptions.tuneKh} disabled={opt.running} /> Ajustar los interruptores Bass y Low-Mid de los KH</label>
+				{/if}
 			</div>
 			<div class="mt-2 flex gap-2">
 				{#if opt.running}
@@ -171,7 +182,8 @@
 				{/if}
 			</div>
 			<p class="mt-1.5 text-muted">
-				Prueba posiciones de tu cabeza por toda la sala; para cada una, los KH en triángulo equilátero a {fmt(Math.max(0.8, app.listenRange[0]), 1)}–{fmt(Math.min(2, app.listenRange[1]), 1)} m, {app.optOptions.facings === 'todas' ? 'mirando hacia cada pared' : 'con tu orientación actual'}{app.sub.enabled ? ', el sub en cada punto del suelo y su fase 0°/180°' : ''}.
+				Prueba posiciones de tu cabeza por toda la sala; para cada una, los KH a {fmt(Math.max(0.8, app.listenRange[0]), 1)}–{fmt(Math.min(2, app.listenRange[1]), 1)} m (cada 10 cm) {app.optOptions.apertures === 'varias' ? 'con aperturas de 50°, 60° y 70°' : 'en triángulo equilátero'}, {app.optOptions.facings === 'todas' ? 'mirando hacia cada pared' : 'con tu orientación actual'}{app.sub.enabled ? ', el sub en cada punto del suelo y su fase 0°/180°' : ''}.
+				{#if app.sub.enabled && app.optOptions.tuneSub}Después afina el corte, el nivel y el filtro de 85 Hz del sub en las 40 mejores colocaciones.{/if}
 				Puntúa con el rango de frecuencias ({app.band[0]}–{app.band[1]} Hz) y los pesos de «Mejor posición». Las paredes, el escritorio y los objetos se respetan.
 			</p>
 			{#if opt.error}<p class="mt-1 rounded bg-red-500/10 px-2 py-1 text-red-700 dark:text-red-300">{opt.error}</p>{/if}
@@ -181,7 +193,7 @@
 			<table class="w-full" id="opt-top">
 				<thead class="text-muted"><tr>
 					<th class="text-left font-medium">#</th><th class="text-right font-medium">Punt.</th><th class="pl-2 text-left font-medium">Oyente X · Y (m)</th>
-					<th class="text-left font-medium">Mira</th><th class="text-right font-medium">Dist.</th><th class="pl-2 text-left font-medium">Sub</th><th></th>
+					<th class="text-left font-medium">Mira</th><th class="text-right font-medium">Dist.</th><th class="text-right font-medium">Apert.</th><th class="pl-2 text-left font-medium">Sub</th><th></th>
 				</tr></thead>
 				<tbody>
 					{#each opt.top as c, i}
@@ -191,7 +203,8 @@
 							<td class="pl-2 tabular-nums">{sk(c.listener)}</td>
 							<td>{facingLabel(c.facing)}</td>
 							<td class="text-right tabular-nums">{fmt(c.dist, 1)} m</td>
-							<td class="pl-2 tabular-nums">{c.sub ? `${sk(c.sub)}${c.subInvert ? ' · 180°' : ''}` : '—'}</td>
+							<td class="text-right tabular-nums">{c.aperture}°</td>
+							<td class="pl-2 tabular-nums">{c.sub ? sk(c.sub) : '—'}</td>
 							<td class="text-right"><button class="text-accent hover:underline" onclick={(e) => { e.stopPropagation(); applyConfig(c); }}>Aplicar</button></td>
 						</tr>
 					{/each}
@@ -200,7 +213,16 @@
 							<td class="py-1">tú</td>
 							<td class="text-right font-semibold tabular-nums" id="opt-current">{fmt(opt.current.score)}</td>
 							<td class="pl-2 tabular-nums">{sk(opt.current.listener)}</td>
-							<td colspan="4">colocación actual</td>
+							<td colspan="5">colocación y ajustes actuales</td>
+						</tr>
+					{/if}
+					{#if opt.currentTuned}
+						<tr class="border-t border-line text-muted {selected === -1 ? 'bg-accent/10' : ''} cursor-pointer" onclick={() => (selected = -1)}>
+							<td class="py-1">tú*</td>
+							<td class="text-right font-semibold tabular-nums" id="opt-current-tuned">{fmt(opt.currentTuned.score)}</td>
+							<td class="pl-2 tabular-nums">{sk(opt.currentTuned.listener)}</td>
+							<td colspan="4">sin mover nada, solo con los ajustes</td>
+							<td class="text-right"><button class="text-accent hover:underline" onclick={(e) => { e.stopPropagation(); applyConfig(opt.currentTuned!); }}>Aplicar</button></td>
 						</tr>
 					{/if}
 				</tbody>
@@ -213,7 +235,23 @@
 							<div class="flex justify-between" title={k.help}><span class="text-muted">{k.label}</span><span class="tabular-nums text-ink">{fmt(100 * (1 - (shown.parts[k.id] ?? 0)))}{opt.current?.parts[k.id] !== undefined ? ` (tú ${fmt(100 * (1 - (opt.current.parts[k.id] ?? 0)))})` : ''}</span></div>
 						{/each}
 					</div>
-					<p class="mt-1.5 text-muted">KH a {fmt(shown.dist, 1)} m de la cabeza, a la altura actual de los KH. «Aplicar» mueve los equipos y el oyente y vuelve a simular para ver el mapa completo.</p>
+					<div class="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 border-t border-line pt-1.5" id="opt-settings">
+						{#if app.sub.enabled}
+							<div class="flex justify-between"><span class="text-muted">Corte del sub</span><span class="tabular-nums text-ink">{shown.settings.xoverHz} Hz</span></div>
+							<div class="flex justify-between"><span class="text-muted">Nivel del sub</span><span class="tabular-nums text-ink">{shown.settings.gainDb > 0 ? '+' : ''}{shown.settings.gainDb} dB</span></div>
+							<div class="flex justify-between"><span class="text-muted">Fase del sub</span><span class="text-ink">{shown.settings.invert ? '180°' : '0°'}</span></div>
+							<div class="flex justify-between"><span class="text-muted">Filtro 85 Hz satélites</span><span class="text-ink">{shown.settings.hpf85 ? 'activado' : 'desactivado'}</span></div>
+						{/if}
+						{#if KH_EQ.enabled}
+							<div class="flex justify-between"><span class="text-muted">KH Bass</span><span class="tabular-nums text-ink">{String(shown.settings.bassDb).replace('.', ',')} dB</span></div>
+							<div class="flex justify-between"><span class="text-muted">KH Low-Mid</span><span class="tabular-nums text-ink">{String(shown.settings.lowMidDb).replace('.', ',')} dB</span></div>
+						{/if}
+					</div>
+					<p class="mt-1.5 text-muted">
+						KH a {fmt(shown.dist, 1)} m de la cabeza con {shown.aperture}° de apertura, a la altura actual de los KH.
+						{#if shown.scoreBefore !== undefined}Con tus ajustes actuales puntuaba {fmt(shown.scoreBefore)}; los ajustes suben {fmt(shown.score - shown.scoreBefore)} puntos.{/if}
+						«Aplicar» mueve los equipos, cambia los ajustes y vuelve a simular para ver el mapa completo.
+					</p>
 				</div>
 			{/if}
 		{/if}

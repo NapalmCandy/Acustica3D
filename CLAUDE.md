@@ -26,7 +26,7 @@ Idioma de trabajo: **español**. El usuario produce hardcore/gabber, escucha alt
 
 ## Acustica3D: puntos clave
 - **Desarrollo:**
-  - `npm install` (`.npmrc` con legacy-peer-deps), `npm run dev`, `npx vitest run` (17 pruebas), `npm run build`.
+  - `npm install` (`.npmrc` con legacy-peer-deps), `npm run dev`, `npx vitest run` (25 pruebas), `npm run build`.
   - Prueba completa: `node testdata/e2e.mjs http://localhost:4173/ cpu|gpu`, con `vite preview` en marcha. Reinicia preview tras cada build.
   - No uses `pkill -f` con un patrón que aparezca en la misma orden.
 - **Simulación:**
@@ -36,6 +36,8 @@ Idioma de trabajo: **español**. El usuario produce hardcore/gabber, escucha alt
   - Criterios: plano, huecos, picos, retumbe, robustez, simetría estéreo (paredes laterales + grave L/R), lejos de paredes y geometría.
   - Zona válida: ≥ 0,5 m de paredes, 0,7–2,5 m, apertura de 30–90°, centrado.
 - **Colocación automática:** `sim/optimize.ts` + `doOptimize` en `sim/sim.worker.ts`. Usa la reciprocidad: una simulación por cada posición del oyente.
+  - Después ajusta el Sub8 (corte, nivel, fase, filtro de 85 Hz) y los interruptores Bass/Low-Mid de los KH en las 40 mejores colocaciones, probando todas las combinaciones (`tuneSettings`).
+- **Interruptores del KH 120 A:** `KH_EQ` en `acoustics/speakers.ts`, ajustados a la gráfica del manual de Neumann (pág. 25): Bass, estante de 183 Hz y Q 0,62; Low-Mid, campana de 260 Hz y Q 0,36; Treble, estante de 5,4 kHz y Q 0,84.
 - **Mapa de la sala:** de 20 a 300 Hz, con animación precalculada (`mapAnim.svelte.ts`, `doFrames`).
 - **Artifact web** (privado): https://claude.ai/artifact/V2mNhwfGzLEqnW9TUmchmo.
   - Se genera con `node scripts_artifact.mjs`; usa `appDir: 'app'` porque el servicio no admite rutas con `_`.

@@ -98,8 +98,46 @@ function peq(f: number, f0: number, g: number, Q: number): Cx {
 	return cdiv(num, den);
 }
 
+/** Estante analógico de 2.º orden: ganancia g dB por debajo (lo) o por encima (hi) de f0 (en f0, g/2). */
+function shelf(f: number, f0: number, g: number, kind: 'lo' | 'hi', Q = Math.SQRT1_2): Cx {
+	if (!g) return [1, 0];
+	const A = Math.pow(10, g / 40), q = Math.sqrt(A) / Q;
+	const s: Cx = [0, f / f0];
+	const s2 = cmul(s, s);
+	const num = kind === 'lo'
+		? cadd(cadd([s2[0] * A, s2[1] * A], [s[0] * q * A, s[1] * q * A]), [A * A, 0])
+		: cadd(cadd([s2[0] * A * A, s2[1] * A * A], [s[0] * q * A, s[1] * q * A]), [A, 0]);
+	const den = kind === 'lo'
+		? cadd(cadd([s2[0] * A, s2[1] * A], [s[0] * q, s[1] * q]), [1, 0])
+		: cadd(cadd(s2, [s[0] * q, s[1] * q]), [A, 0]);
+	return cdiv(num, den);
+}
+
+/** Interruptores del panel trasero del KH 120 A. Niveles del manual de Neumann; frecuencias y Q
+ *  ajustados a la gráfica «Acoustical Controls» del manual (pág. 25), extrayendo sus trazos vectoriales
+ *  y restando la curva de referencia: error típico < 0,2 dB entre 40 Hz y 2 kHz.
+ *  Con `enabled = false` se ignoran (y desaparecen de la barra lateral y del optimizador). */
+export const KH_EQ = {
+	enabled: true,
+	bassHz: 182.5, // Bass: estante bajo (carga de una pared cercana)
+	bassQ: 0.62,
+	lowMidHz: 260, // Low-Mid: campana ancha (carga de la mesa o la consola)
+	lowMidQ: 0.36,
+	trebleHz: 5430, // Treble: estante alto (fuera de la simulación de graves)
+	trebleQ: 0.84
+};
+
+export const KH_SWITCHES = {
+	bassDb: [0, -2.5, -5, -7.5],
+	lowMidDb: [0, -1.5, -3, -4.5],
+	trebleDb: [1, 0, -1, -2]
+} as const;
+
 export interface KhOptions {
 	satHpf85: boolean; // filtro de 85 Hz de las salidas a satélites del Sub8
+	bassDb?: number;
+	lowMidDb?: number;
+	trebleDb?: number;
 }
 
 /** Respuesta del KH 120 A (en eje, 1 m, campo libre equivalente), 0 dB en banda media. */
@@ -108,6 +146,11 @@ export function khResponse(f: number, o: KhOptions): Cx {
 	// cruce LR4 a 2 kHz (pasatodo en la suma)
 	h = cmul(h, cadd(lr4(f, KH.fXo, 'lp'), lr4(f, KH.fXo, 'hp')));
 	if (o.satHpf85) h = cmul(h, butter(f, 85, 2, 'hp')); // [estimado] 12 dB/oct
+	if (KH_EQ.enabled) {
+		if (o.bassDb) h = cmul(h, shelf(f, KH_EQ.bassHz, o.bassDb, 'lo', KH_EQ.bassQ));
+		if (o.lowMidDb) h = cmul(h, peq(f, KH_EQ.lowMidHz, o.lowMidDb, KH_EQ.lowMidQ));
+		if (o.trebleDb) h = cmul(h, shelf(f, KH_EQ.trebleHz, o.trebleDb, 'hi', KH_EQ.trebleQ));
+	}
 	return h;
 }
 

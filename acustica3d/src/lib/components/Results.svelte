@@ -27,7 +27,7 @@
 
 	const resp = $derived.by(() => {
 		if (!res) return null;
-		void JSON.stringify(app.sub); void app.kh.satHpf85;
+		void JSON.stringify(app.sub); void JSON.stringify(app.kh);
 		const frac = app.smoothing;
 		const curve = (ch: 'L' | 'R' | 'mono', rcv = 0, withSub = true) => magnitudeCurve(systemSpectrum(res, rcv, ch, withSub), fLo, fHi, 48, frac);
 		// normalización: mono → nivel medio 0 dB entre 80 y 200 Hz (relativo, para leer desviaciones)
@@ -72,7 +72,7 @@
 
 	const centerSpectrum = $derived.by(() => {
 		if (!res) return null;
-		void JSON.stringify(app.sub); void app.kh.satHpf85;
+		void JSON.stringify(app.sub); void JSON.stringify(app.kh);
 		return systemSpectrum(res, 0, 'mono');
 	});
 

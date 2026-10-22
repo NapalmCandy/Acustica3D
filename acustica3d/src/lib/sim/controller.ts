@@ -1,9 +1,9 @@
 // Orquestación de la simulación desde el hilo principal.
 import { app, emptyOpt, type DeviceId, type SimResult } from '../state.svelte';
 import { roomTF, combine, type Spectrum } from '../dsp/analysis';
-import { khResponse, subResponse, cmul, type Cx } from '../acoustics/speakers';
+import { khResponse, subResponse, cmul, KH_EQ, type Cx } from '../acoustics/speakers';
 import type { RunRequest, WorkerMsg, LevelResult, LevelSpec, FramesChunk, OptRequest } from './sim.worker';
-import type { OptConfig } from './optimize';
+import type { OptConfig, Settings } from './optimize';
 import { anim, animData, mapFMax } from '../mapAnim.svelte';
 import SimWorker from './sim.worker?worker';
 import type { V3 } from './voxel';
@@ -136,7 +136,7 @@ function onFrames(m: FramesChunk) {
 
 /** Respuesta eléctrica-acústica de cada fuente (altavoz + cruce), por canal reproducido. */
 export function sourceGain(id: string, f: number, channel: 'L' | 'R' | 'mono'): Cx {
-	const kh = khResponse(f, { satHpf85: app.kh.satHpf85 });
+	const kh = khResponse(f, app.kh);
 	if (id === 'khL') return channel === 'R' ? [0, 0] : kh;
 	if (id === 'khR') return channel === 'L' ? [0, 0] : kh;
 	if (id === 'sub') {
@@ -216,20 +216,29 @@ export function runOptimize() {
 	// copias planas (las runas $state.snapshot solo existen en archivos .svelte/.svelte.ts)
 	const plain = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 	const sub = plain(app.sub);
-	const gK = freqs.map((f) => khResponse(f, { satHpf85: app.kh.satHpf85 }));
-	const gS = freqs.map((f) => subResponse(f, { ...sub, polarityInvert: false }));
+	const kh = plain(app.kh);
+	// ajustes actuales (punto de partida) y cuáles puede cambiar el optimizador
+	const start: Settings = {
+		xoverHz: sub.xoverHz, gainDb: sub.gainDb, invert: sub.polarityInvert, hpf85: kh.satHpf85,
+		bassDb: kh.bassDb ?? 0, lowMidDb: kh.lowMidDb ?? 0
+	};
+	const tune: (keyof Settings)[] = [];
+	if (app.sub.enabled) tune.push('invert'); // la fase se ha probado siempre: es un conmutador
+	if (app.sub.enabled && o.tuneSub) tune.push('xoverHz', 'gainDb', 'hpf85');
+	if (KH_EQ.enabled && o.tuneKh) tune.push('bassDb', 'lowMidDb');
 	const mid = [(P.khL[0] + P.khR[0]) / 2, (P.khL[2] + P.khR[2]) / 2];
 	const curFacing = Math.round((Math.atan2(mid[0] - P.listener[0], -(mid[1] - P.listener[2])) * 180) / Math.PI);
 	const distances: number[] = [];
-	for (let d = Math.max(0.8, app.listenRange[0]); d <= Math.min(2.0, app.listenRange[1]) + 1e-6; d += 0.2) distances.push(Math.round(d * 100) / 100);
+	for (let d = Math.max(0.8, app.listenRange[0]); d <= Math.min(2.0, app.listenRange[1]) + 1e-6; d += 0.1) distances.push(Math.round(d * 100) / 100);
 	const req: OptRequest = {
 		type: 'optimize', tris: inp.tris, triMat: inp.triMat, betaByMat: inp.betaByMat, seed: inp.seed,
 		fmax, ppw: prec.ppw, durationS: 1.0, engine: app.engine, tLate: 0.12,
 		listenerY: P.listener[1], khY: P.khL[1], subY: P.sub[1], subEnabled: app.sub.enabled,
-		freqs, gK, gS, weights: plain(app.weights), distances,
+		freqs, start, tune, subDelayMs: sub.extraDelayMs ?? 0, weights: plain(app.weights), distances,
+		apertures: o.apertures === 'varias' ? [50, 60, 70] : [60],
 		facings: o.facings === 'todas' ? [0, 90, 180, 270] : [curFacing],
 		subMaxDist: o.sub === 'cerca' ? 1.5 : null, step: prec.step,
-		current: { listener: P.listener, khL: P.khL, khR: P.khR, sub: app.sub.enabled ? P.sub : null, subInvert: app.sub.polarityInvert }
+		current: { listener: P.listener, khL: P.khL, khR: P.khR, sub: app.sub.enabled ? P.sub : null }
 	};
 	app.opt = { ...emptyOpt(), running: true, phase: 'Preparando la sala' };
 	optWorker = new SimWorker();
@@ -238,7 +247,7 @@ export function runOptimize() {
 		if (m.type === 'opt-start') app.opt = { ...app.opt, footprint: { mask: m.mask, nx: m.nx, nz: m.nz, dx: m.dx, origin: m.origin }, total: m.total, engine: m.engine, nSub: m.nSub };
 		else if (m.type === 'opt-step') app.opt = { ...app.opt, done: m.done, total: m.total, phase: m.phase, frac: m.frac, testing: m.testing, tested: m.tested, top: m.top, current: m.current };
 		else if (m.type === 'opt-done') {
-			app.opt = { ...app.opt, running: false, testing: null, top: m.top, current: m.current, tested: m.tested, done: app.opt.total, phase: 'Terminado', elapsedS: m.elapsedS };
+			app.opt = { ...app.opt, running: false, testing: null, top: m.top, current: m.current, currentTuned: m.currentTuned, tested: m.tested, done: app.opt.total, phase: 'Terminado', elapsedS: m.elapsedS };
 			optWorker?.terminate();
 			optWorker = null;
 		} else if (m.type === 'error') app.opt = { ...app.opt, running: false, error: m.message };
@@ -253,15 +262,24 @@ export function cancelOptimize() {
 	if (app.opt.running) app.opt = { ...app.opt, running: false, testing: null, phase: 'Detenido' };
 }
 
-/** Coloca los equipos y el oyente como en una combinación encontrada (se vuelve a simular sola). */
+/** Aplica una combinación encontrada: posiciones (se vuelve a simular sola) y ajustes del sub
+ *  (al instante, sin simular). */
 export function applyConfig(c: OptConfig) {
 	const r = (v: number) => Math.round(v * 1000) / 1000;
 	const rv = (p: V3): V3 => [r(p[0]), r(p[1]), r(p[2])];
 	app.positions.listener = rv(c.listener);
 	app.positions.khL = rv(c.khL);
 	app.positions.khR = rv(c.khR);
-	if (c.sub) {
-		app.positions.sub = rv(c.sub);
-		app.sub.polarityInvert = c.subInvert;
+	if (c.sub) app.positions.sub = rv(c.sub);
+	const st = c.settings;
+	if (app.sub.enabled) {
+		app.sub.xoverHz = st.xoverHz;
+		app.sub.gainDb = st.gainDb;
+		app.sub.polarityInvert = st.invert;
+		app.kh.satHpf85 = st.hpf85;
+	}
+	if (KH_EQ.enabled) {
+		app.kh.bassDb = st.bassDb;
+		app.kh.lowMidDb = st.lowMidDb;
 	}
 }

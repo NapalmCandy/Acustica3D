@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { KH_EQ, KH_SWITCHES } from '../acoustics/speakers';
+	const fmtDb = (v: number) => (v > 0 ? '+' : '') + String(v).replace('.', ',') + ' dB';
 	import { app, toSketchup, fromSketchup, type DeviceId } from '../state.svelte';
 	import { LIBRARY, OCTAVES } from '../acoustics/materials';
 	import { importFile, objectFromTris } from '../geometry/importer';
@@ -184,6 +186,23 @@
 		</div>
 		<button class="btn mt-2 w-full" onclick={() => placeTriangle(triDist, (app.bbox?.min[1] ?? 0) + triHeight)}>Colocar los KH respecto al oyente</button>
 	</div>
+	{#if KH_EQ.enabled}
+		<div class="rounded-md border border-line p-2.5 text-xs">
+			<div class="mb-1.5 text-sm font-medium text-ink">Interruptores de los KH 120 A</div>
+			<div class="grid grid-cols-3 gap-2">
+				<label>Bass
+					<select class="input w-full" bind:value={app.kh.bassDb}>{#each KH_SWITCHES.bassDb as v}<option value={v}>{fmtDb(v)}</option>{/each}</select>
+				</label>
+				<label>Low-Mid
+					<select class="input w-full" bind:value={app.kh.lowMidDb}>{#each KH_SWITCHES.lowMidDb as v}<option value={v}>{fmtDb(v)}</option>{/each}</select>
+				</label>
+				<label>Treble
+					<select class="input w-full" bind:value={app.kh.trebleDb}>{#each KH_SWITCHES.trebleDb as v}<option value={v}>{fmtDb(v)}</option>{/each}</select>
+				</label>
+			</div>
+			<p class="mt-1.5 text-muted">Se aplican al instante, sin volver a simular. Treble solo afecta por encima de ~5 kHz, fuera de esta simulación de graves.</p>
+		</div>
+	{/if}
 	<div class="rounded-md border border-line p-2.5 text-xs">
 		<div class="mb-1.5 text-sm font-medium text-ink">Sub8 y cruce <span class="text-muted">(filtros estimados)</span></div>
 		<label class="flex items-center gap-2"><input type="checkbox" bind:checked={app.sub.enabled} /> Sub8 activo</label>

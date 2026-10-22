@@ -72,6 +72,12 @@ Prueba de extremo a extremo en Chromium: `node testdata/e2e.mjs URL gpu|cpu`. Co
 
 ## Historial de cambios
 
+### v0.5
+- La colocación automática también ajusta el Sub8 (corte, nivel, fase y filtro de 85 Hz de los satélites) y los interruptores Bass y Low-Mid de los KH. Lo hace en dos etapas: primero la colocación y después los ajustes de las 40 mejores, probando todas las combinaciones (son pocas y no hace falta simular).
+- Prueba más colocaciones: distancias cada 10 cm y aperturas de 50°, 60° y 70°.
+- Fila «tú*»: tu colocación actual solo cambiando los ajustes.
+- Interruptores Bass, Low-Mid y Treble de los KH 120 A en la barra lateral, modelados a partir de la gráfica del manual de Neumann (pág. 25). Se desactivan con `KH_EQ.enabled` en `speakers.ts`.
+
 ### v0.4.1
 - Busca actualizaciones también al volver a la ventana (como mucho una vez cada 5 minutos).
 

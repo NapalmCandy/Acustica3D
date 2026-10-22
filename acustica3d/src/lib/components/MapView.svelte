@@ -38,7 +38,7 @@
 	/** Barrido completo en dB (fotogramas × celdas), mono con altavoces y cruce; con 1/3 oct opcional. */
 	const sweep = $derived.by(() => {
 		if (!framesReady) return null;
-		void JSON.stringify(app.sub); void app.kh.satHpf85;
+		void JSON.stringify(app.sub); void JSON.stringify(app.kh);
 		const { freqs, ids, nCells: nC, re, im } = animData;
 		const nF = freqs.length;
 		const pow = new Float32Array(nF * nC);
@@ -136,7 +136,7 @@
 		busy = false;
 	}
 	$effect(() => {
-		void app.mapFreq; void app.mapBand; void app.result; void JSON.stringify(app.sub); void app.kh.satHpf85;
+		void app.mapFreq; void app.mapBand; void app.result; void JSON.stringify(app.sub); void JSON.stringify(app.kh);
 		if (framesReady) return;
 		const t = setTimeout(computeSingle, 120);
 		return () => clearTimeout(t);

@@ -26,7 +26,10 @@ Se abre en su propia ventana y **se actualiza solo** cuando hay una versión nue
 ## Qué te muestra
 
 - **Mejor posición:** mapa en verde (mejor) y rojo (peor) de dónde sentarte con los altavoces donde están. Al mover la cabeza ves la curva de graves de ese punto al instante. Puedes elegir qué frecuencias cuentan, por ejemplo 40–200 Hz si tu música o tu sub no bajan más.
-- **Colocación automática:** prueba combinaciones de altavoces, sub y posición de escucha por toda la sala y te propone las mejores. Con un clic lo coloca todo así.
+- **Colocación automática:** prueba combinaciones de altavoces, sub y posición de escucha por toda la sala y te propone las mejores.
+  - También ajusta el sub (corte, nivel, fase y filtro de 85 Hz) y los interruptores Bass y Low-Mid de los KH 120 A.
+  - Te dice cuánto ganarías sin mover nada, solo con esos ajustes.
+  - Con un clic lo coloca y lo ajusta todo así.
 - **Respuesta:** la curva de graves en tu sitio. Distingue los picos, que se pueden recortar con ecualización, de los huecos, que no.
 - **Decaimiento:** cuánto tarda en apagarse cada frecuencia, es decir, cuánto "retumba" la sala.
 - **Mapa de la sala:** cómo se reparte cada frecuencia por la habitación, de 20 a 300 Hz. Con **Play** se ve el barrido animado.

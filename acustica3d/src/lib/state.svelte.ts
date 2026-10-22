@@ -18,6 +18,8 @@ export interface OptState {
 	tested: { pos: V3; score: number }[];
 	top: OptConfig[];
 	current: OptConfig | null;
+	/** tu colocación actual, solo cambiando los ajustes */
+	currentTuned: OptConfig | null;
 	footprint: { mask: Uint8Array; nx: number; nz: number; dx: number; origin: V3 } | null;
 	engine: string;
 	nSub: number;
@@ -25,7 +27,7 @@ export interface OptState {
 	error: string | null;
 }
 export const emptyOpt = (): OptState => ({
-	running: false, phase: '', done: 0, total: 0, frac: 0, testing: null, tested: [], top: [], current: null,
+	running: false, phase: '', done: 0, total: 0, frac: 0, testing: null, tested: [], top: [], current: null, currentTuned: null,
 	footprint: null, engine: '', nSub: 0, elapsedS: null, error: null
 });
 
@@ -91,7 +93,7 @@ class AppState {
 	objects = $state<RoomObject[]>([]);
 	private objCounter = 0;
 
-	kh = $state({ satHpf85: false });
+	kh = $state({ satHpf85: false, bassDb: 0, lowMidDb: 0, trebleDb: 0 });
 	sub = $state({ enabled: true, xoverHz: 85, polarityInvert: false, gainDb: 0, extraDelayMs: 0 });
 
 	sim = $state({ fmax: 350, ppw: 10, durationS: 1.5, areaHalf: 0.25 });
@@ -111,7 +113,10 @@ class AppState {
 	listenRange = $state<[number, number]>([0.7, 2.5]);
 	/** colocación automática */
 	opt = $state.raw<OptState>(emptyOpt());
-	optOptions = $state({ facings: 'todas' as 'todas' | 'actual', sub: 'cualquiera' as 'cualquiera' | 'cerca', precision: 'normal' as 'rapida' | 'normal' | 'fina' });
+	optOptions = $state({
+		facings: 'todas' as 'todas' | 'actual', sub: 'cualquiera' as 'cualquiera' | 'cerca', precision: 'normal' as 'rapida' | 'normal' | 'fina',
+		apertures: 'varias' as 'varias' | 'equilatero', tuneSub: true, tuneKh: true
+	});
 	/** celda del mapa bajo el ratón (vista previa de su respuesta), −1 = ninguna */
 	hoverCell = $state(-1);
 
@@ -189,7 +194,8 @@ class AppState {
 		if (p?.app !== 'Acustica3D' && p?.app !== 'Sala3D') throw new Error('No es un proyecto de Acustica3D.'); // Sala3D: nombre antiguo
 		for (const [k, v] of Object.entries(p.matMap ?? {})) if (this.matMap[k] || !this.materialNames.length) this.matMap[k] = v;
 		this.positions = p.positions;
-		this.kh = p.kh;
+		// proyectos antiguos no traen los interruptores del KH
+		this.kh = Object.assign({ satHpf85: false, bassDb: 0, lowMidDb: 0, trebleDb: 0 }, p.kh);
 		this.sub = p.sub;
 		this.sim = p.sim;
 		if (p.objects) this.objects = p.objects;

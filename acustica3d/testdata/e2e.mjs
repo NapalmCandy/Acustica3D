@@ -188,11 +188,18 @@ const best = parseFloat((await page.locator('#opt-top tbody tr').first().locator
 const cur = parseFloat((await page.locator('#opt-current').innerText()).replace(',', '.'));
 check('colocación automática terminada', rows >= 3, `${optInfo} · en ${((Date.now() - tOpt) / 1000).toFixed(0)} s · ${rows - 1} propuestas`);
 check('la mejor propuesta mejora tu colocación actual', best >= cur, `mejor ${best} / actual ${cur}`);
+const tunedCur = parseFloat((await page.locator('#opt-current-tuned').innerText()).replace(',', '.'));
+check('solo con los ajustes del sub, tu colocación mejora o se queda igual', tunedCur >= cur, `actual ${cur} → con ajustes ${tunedCur}`);
+const ajustes = (await page.locator('#opt-settings').innerText()).replace(/\n/g, ' ');
+const xoverProp = parseInt(/Corte del sub\s*(\d+)/.exec(ajustes)?.[1] ?? 'NaN');
+check('propone ajustes del sub', Number.isFinite(xoverProp), ajustes);
 await page.screenshot({ path: OUT + '11_colocacion_hecha.png' });
 const youBefore = await page.locator('text=Tu posición actual').count();
 await page.locator('#opt-top tbody tr').first().locator('button', { hasText: 'Aplicar' }).click();
 await page.waitForSelector('text=/^Hecho: /', { state: 'detached', timeout: 30000 }).catch(() => {});
 await page.waitForSelector('text=/^Hecho: /', { timeout: 600000 });
+const xoverApplied = parseInt(await page.locator('label', { hasText: 'Corte del sub' }).locator('input').inputValue());
+check('aplicar también cambia los ajustes del sub', xoverApplied === xoverProp, `corte ${xoverApplied} Hz`);
 await page.click('role=tab[name="Mejor posición"]');
 await page.waitForTimeout(600);
 const after = await bestTxt();

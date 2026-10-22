@@ -22,7 +22,7 @@
 		const sp = app.spectra;
 		const res = app.result;
 		if (!sp || !res) return null;
-		void JSON.stringify(app.sub); void app.kh.satHpf85; void JSON.stringify(app.weights);
+		void JSON.stringify(app.sub); void JSON.stringify(app.kh); void JSON.stringify(app.weights);
 		const pos = res.positionsAtRun;
 		const band: [number, number] = [app.band[0], app.band[1]];
 		const [minListenDist, maxListenDist] = app.listenRange;
@@ -48,7 +48,7 @@
 	const live = $derived.by(() => {
 		const sp = app.spectra;
 		if (!sp || !scores) return null;
-		void JSON.stringify(app.sub); void app.kh.satHpf85;
+		void JSON.stringify(app.sub); void JSON.stringify(app.kh);
 		const f = sp.freqs;
 		const curves: Curve[] = [];
 		const add = (c: number, label: string, color: string, dash = false) => {

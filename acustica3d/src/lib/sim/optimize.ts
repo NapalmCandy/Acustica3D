@@ -4,7 +4,7 @@
 // fuente en B medida en A. Así, con UNA simulación con la fuente en la cabeza del oyente se obtiene
 // a la vez la respuesta de todas las posiciones posibles de los KH y del sub, y se pueden puntuar
 // miles de combinaciones sin volver a simular. Hace falta una simulación por cada posición del oyente.
-import type { Cx } from '../acoustics/speakers';
+import { khResponse, subResponse, KH_SWITCHES, type Cx } from '../acoustics/speakers';
 import type { V3 } from './voxel';
 import type { Criterion } from '../analysis/score';
 
@@ -22,11 +22,13 @@ export function facingDir(deg: number): [number, number] {
 	return [Math.sin(a), -Math.cos(a)];
 }
 
-/** KH en triángulo equilátero delante del oyente (a `dist` m de la cabeza, a la altura `khY`). */
-export function khPair(listener: V3, facingDeg: number, dist: number, khY: number): { khL: V3; khR: V3 } {
+/** KH delante del oyente, a `dist` m de la cabeza y a la altura `khY`, con una apertura total de
+ *  `apertureDeg` (60° = triángulo equilátero). */
+export function khPair(listener: V3, facingDeg: number, dist: number, khY: number, apertureDeg = 60): { khL: V3; khR: V3 } {
 	const [ux, uz] = facingDir(facingDeg);
 	const rx = -uz, rz = ux; // derecha del oyente
-	const f = dist * Math.cos(Math.PI / 6), s = dist * Math.sin(Math.PI / 6);
+	const half = (apertureDeg / 2) * (Math.PI / 180);
+	const f = dist * Math.cos(half), s = dist * Math.sin(half);
 	return {
 		khL: [listener[0] + f * ux - s * rx, khY, listener[2] + f * uz - s * rz],
 		khR: [listener[0] + f * ux + s * rx, khY, listener[2] + f * uz + s * rz]
@@ -92,14 +94,109 @@ export function totalScore(parts: Partial<Record<Criterion, number>>, weights: R
 	return 100 * (1 - bad / (wsum || 1));
 }
 
+/** Ajustes que se pueden tocar sin mover nada: los del Sub8 (corte, nivel, fase y filtro de 85 Hz
+ *  de las salidas a satélites) y, cuando se active KH_EQ, los interruptores Bass y Low-Mid de los KH. */
+export interface Settings {
+	xoverHz: number;
+	gainDb: number;
+	invert: boolean;
+	hpf85: boolean;
+	bassDb: number;
+	lowMidDb: number;
+}
+
+export const SETTING_VALUES: { [K in keyof Settings]: Settings[K][] } = {
+	xoverHz: [50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150],
+	gainDb: [-10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6],
+	invert: [false, true],
+	hpf85: [false, true],
+	bassDb: [...KH_SWITCHES.bassDb],
+	lowMidDb: [...KH_SWITCHES.lowMidDb]
+};
+
+/** Respuestas de KH y sub por frecuencia para unos ajustes (con caché: se repiten mucho). */
+export class GainCache {
+	private kh = new Map<string, Cx[]>();
+	private sub = new Map<string, Cx[]>();
+	constructor(private freqs: number[], private subDelayMs = 0) {}
+	gK(s: Settings): Cx[] {
+		const k = `${s.hpf85}|${s.bassDb}|${s.lowMidDb}`;
+		let v = this.kh.get(k);
+		if (!v) this.kh.set(k, (v = this.freqs.map((f) => khResponse(f, { satHpf85: s.hpf85, bassDb: s.bassDb, lowMidDb: s.lowMidDb }))));
+		return v;
+	}
+	/** sin invertir: la fase se aplica aparte (pol = ±1) */
+	gS(s: Settings): Cx[] {
+		const k = `${s.xoverHz}|${s.gainDb}`;
+		let v = this.sub.get(k);
+		if (!v)
+			this.sub.set(k, (v = this.freqs.map((f) => subResponse(f, { enabled: true, xoverHz: s.xoverHz, gainDb: s.gainDb, polarityInvert: false, extraDelayMs: this.subDelayMs }))));
+		return v;
+	}
+}
+
+/** Busca los mejores ajustes. Si las combinaciones son pocas (los del sub son 11 × 17 × 2 × 2 = 748, y
+ *  evaluar cada una cuesta microsegundos) las prueba todas: óptimo garantizado. Si son demasiadas, usa
+ *  descenso por coordenadas (cambia un ajuste cada vez mientras mejore), que es mucho más rápido pero
+ *  puede quedarse en un óptimo local. */
+export function tuneSettings(
+	evaluate: (s: Settings) => number,
+	start: Settings,
+	keys: (keyof Settings)[],
+	maxExhaustive = 20000,
+	maxRounds = 6
+): { settings: Settings; score: number; evals: number } {
+	let best = { ...start };
+	let bestScore = evaluate(best);
+	let evals = 1;
+	const combos = keys.reduce((n, k) => n * SETTING_VALUES[k].length, 1);
+	if (combos <= maxExhaustive) {
+		const rec = (i: number, s: Settings) => {
+			if (i === keys.length) {
+				const sc = evaluate(s);
+				evals++;
+				if (sc > bestScore + 1e-9) {
+					best = s;
+					bestScore = sc;
+				}
+				return;
+			}
+			for (const v of SETTING_VALUES[keys[i]] as (number | boolean)[]) rec(i + 1, { ...s, [keys[i]]: v } as Settings);
+		};
+		rec(0, { ...start });
+		return { settings: best, score: bestScore, evals };
+	}
+	for (let round = 0; round < maxRounds; round++) {
+		let improved = false;
+		for (const k of keys) {
+			for (const v of SETTING_VALUES[k] as (number | boolean)[]) {
+				if (best[k] === v) continue;
+				const cand = { ...best, [k]: v } as Settings;
+				const sc = evaluate(cand);
+				evals++;
+				if (sc > bestScore + 1e-9) {
+					best = cand;
+					bestScore = sc;
+					improved = true;
+				}
+			}
+		}
+		if (!improved) break;
+	}
+	return { settings: best, score: bestScore, evals };
+}
+
 export interface OptConfig {
 	score: number;
 	listener: V3;
 	facing: number;
 	dist: number;
+	aperture: number;
+	settings: Settings;
+	/** puntuación antes de afinar los ajustes (con los de partida) */
+	scoreBefore?: number;
 	khL: V3;
 	khR: V3;
 	sub: V3 | null;
-	subInvert: boolean;
 	parts: Partial<Record<Criterion, number>>;
 }

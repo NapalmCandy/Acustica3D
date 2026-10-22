@@ -52,9 +52,9 @@ Esos datos se descartan para el A.
 ## 4. Controles traseros
 | Control | Posiciones | Notas |
 |---|---|---|
-| Bass | 0 / −2,5 / −5 / −7,5 dB | Shelving por debajo de unos ~400 Hz (según SOS; frecuencia exacta sin confirmar) [N + R] |
-| Low-Mid | 0 / −1,5 / −3 / −4,5 dB | Campana centrada en los graves-medios, para la carga de una mesa o consola [N] |
-| Treble | +1 / 0 / −1 / −2 dB | Shelving por encima de unos 5 kHz [N + R] |
+| Bass | 0 / −2,5 / −5 / −7,5 dB | Estante de 2.º orden en 183 Hz, Q 0,62: empieza hacia 400 Hz y llega al nivel completo por debajo de ~60 Hz [N: gráfica del manual, pág. 25, ajustada a sus trazos vectoriales] |
+| Low-Mid | 0 / −1,5 / −3 / −4,5 dB | Campana ancha en 260 Hz, Q 0,36, para la carga de una mesa o consola [N: gráfica del manual, pág. 25] |
+| Treble | +1 / 0 / −1 / −2 dB | Estante en 5,4 kHz, Q 0,84 [N: gráfica del manual, pág. 25] |
 | Output level | 94 / 100 / 108 / 114 dB SPL a 1 m con 0 dBu | Impedancia de entrada: 10 kΩ en 94/108 y 20 kΩ en 100/114 [D] |
 | Input gain | 0 … −15 dB (rotativo) | [D] |
 

@@ -8,7 +8,7 @@ import { getDevice, uploadGrid, runGpu, destroyGrid, gpuInfo, isSoftwareGpu } fr
 import { goertzel } from '../dsp/analysis';
 import type { Cx } from '../acoustics/speakers';
 import { wallCriteria, type PlaneSpectra, type Criterion } from '../analysis/score';
-import { khPair, acousticParts, totalScore, type PointTF, type OptConfig } from './optimize';
+import { khPair, acousticParts, totalScore, GainCache, tuneSettings, type PointTF, type OptConfig, type Settings } from './optimize';
 
 export interface LevelSpec {
 	fmax: number;
@@ -81,22 +81,33 @@ export interface OptRequest {
 	subY: number;
 	subEnabled: boolean;
 	freqs: number[];
-	gK: Cx[];
-	gS: Cx[];
+	/** ajustes actuales (punto de partida) y cuáles se pueden cambiar */
+	start: Settings;
+	tune: (keyof Settings)[];
+	subDelayMs: number;
 	weights: Record<Criterion, number>;
 	distances: number[];
+	apertures: number[];
 	facings: number[];
 	/** distancia máxima (m) del sub al punto medio de los KH; null = cualquier sitio */
 	subMaxDist: number | null;
 	/** separación de la rejilla gruesa de posiciones del oyente (m) */
 	step: number;
-	current: { listener: V3; khL: V3; khR: V3; sub: V3 | null; subInvert: boolean };
+	current: { listener: V3; khL: V3; khR: V3; sub: V3 | null };
 }
 
 export type OptMsg =
 	| { type: 'opt-start'; mask: Uint8Array; nx: number; nz: number; dx: number; origin: V3; total: number; engine: string; nSub: number }
 	| { type: 'opt-step'; done: number; total: number; phase: string; frac: number; testing: V3 | null; tested: { pos: V3; score: number }[]; top: OptConfig[]; current: OptConfig | null }
-	| { type: 'opt-done'; elapsedS: number; top: OptConfig[]; current: OptConfig | null; tested: { pos: V3; score: number }[] };
+	| { type: 'opt-done'; elapsedS: number; top: OptConfig[]; current: OptConfig | null; currentTuned: OptConfig | null; tested: { pos: V3; score: number }[] };
+
+/** Candidato interno: además de la combinación, sus respuestas (para afinar los ajustes sin simular). */
+type Cand = OptConfig & { tf: { L: PointTF; R: PointTF; S: PointTF | null }; wall: { sideAsym: number; near: number } };
+const strip = (c: Cand | null): OptConfig | null => {
+	if (!c) return null;
+	const { tf: _tf, wall: _w, ...rest } = c;
+	return rest;
+};
 
 export interface LevelResult {
 	type: 'level';
@@ -448,7 +459,8 @@ async function doOptimize(r: OptRequest) {
 			if (clear(p, 0.5)) grid1.push(p);
 		}
 	const refineN = 3 * 8 + 8;
-	let total = 1 + grid1.length + refineN;
+	let total = 1 + grid1.length + refineN + (r.tune.length ? 1 : 0);
+	const gc = new GainCache(r.freqs, r.subDelayMs);
 
 	// motor
 	let device = r.engine !== 'cpu' ? await getDevice() : null;
@@ -459,33 +471,43 @@ async function doOptimize(r: OptRequest) {
 	post({ type: 'opt-start', mask, nx: grid.nx, nz: grid.nz, dx, origin: grid.origin, total, engine, nSub: subCands.length });
 
 	const tested: { pos: V3; score: number }[] = [];
-	const configs: OptConfig[] = [];
-	let current: OptConfig | null = null;
+	const configs: Cand[] = []; // los mejores de cada posición de escucha
+	let current: Cand | null = null;
+	let currentTuned: Cand | null = null;
 	const testedKeys = new Set<string>();
 	const key = (p: V3) => `${Math.round(p[0] * 100)}|${Math.round(p[2] * 100)}`;
 	let done = 0;
 	let phase = 'Probando tu colocación actual';
 
-	const top = () => {
-		const out: OptConfig[] = [];
+	const topCands = (n: number) => {
+		const out: Cand[] = [];
 		for (const c of [...configs].sort((a, b) => b.score - a.score)) {
 			if (out.some((o) => Math.hypot(o.listener[0] - c.listener[0], o.listener[2] - c.listener[2]) < 0.15 && o.facing === c.facing)) continue;
 			out.push(c);
-			if (out.length >= 5) break;
+			if (out.length >= n) break;
 		}
 		return out;
 	};
+	const top = () => topCands(5).map((c) => strip(c)!);
 	const step = (testing: V3 | null, frac: number) =>
-		post({ type: 'opt-step', done, total, phase, frac, testing, tested: tested.slice(), top: top(), current });
+		post({ type: 'opt-step', done, total, phase, frac, testing, tested: tested.slice(), top: top(), current: strip(current) });
+	// puntuación de una combinación ya simulada con unos ajustes
+	const scoreWith = (tf: Cand['tf'], wall: Cand['wall'], st: Settings) => {
+		const ac = acousticParts(tf.L, tf.R, tf.S, gc.gK(st), gc.gS(st), st.invert ? -1 : 1);
+		const parts = { ...ac, simetria: 0.65 * wall.sideAsym + 0.35 * ac.simetria, paredes: wall.near };
+		return { score: totalScore(parts, r.weights), parts };
+	};
+	const canInvert = r.tune.includes('invert');
 
 	/** Simula con la fuente en la cabeza y puntúa todas las combinaciones de KH y sub. */
 	async function evaluate(P: V3, extra?: OptRequest['current']): Promise<OptConfig | null> {
-		const pairs: { facing: number; dist: number; khL: V3; khR: V3 }[] = [];
+		const pairs: { facing: number; dist: number; aperture: number; khL: V3; khR: V3 }[] = [];
 		for (const facing of r.facings)
-			for (const dist of r.distances) {
-				const { khL, khR } = khPair(P, facing, dist, r.khY);
-				if (clear(khL, 0.15) && clear(khR, 0.15)) pairs.push({ facing, dist, khL, khR });
-			}
+			for (const aperture of r.apertures)
+				for (const dist of r.distances) {
+					const { khL, khR } = khPair(P, facing, dist, r.khY, aperture);
+					if (clear(khL, 0.15) && clear(khR, 0.15)) pairs.push({ facing, dist, aperture, khL, khR });
+				}
 		const receivers: V3[] = [];
 		for (const p of pairs) receivers.push(p.khL, p.khR);
 		const subBase = receivers.length;
@@ -509,40 +531,45 @@ async function doOptimize(r: OptRequest) {
 			}
 		} else out = run({ prep, ...args });
 		const tfs = out.irs.map((ir) => pointTF(ir, out.pulse, out.fs, out.K, r.freqs, r.tLate));
-		const score = (facing: number, dist: number, khL: V3, khR: V3, L: PointTF, R: PointTF, subs: { pos: V3; tf: PointTF }[], pols = [1, -1]): OptConfig => {
+		// con los ajustes de partida (la fase del sub se prueba ya aquí si se puede cambiar)
+		const score = (facing: number, dist: number, aperture: number, khL: V3, khR: V3, L: PointTF, R: PointTF, subs: { pos: V3; tf: PointTF }[], pols: boolean[]): Cand => {
 			const mid: V3 = [(khL[0] + khR[0]) / 2, r.khY, (khL[2] + khR[2]) / 2];
 			const wc = wallCriteria(plane, P[0], P[2], mid[0], mid[2]);
-			let best: OptConfig | null = null;
+			const wall = { sideAsym: wc.sideAsym, near: wc.near };
+			let best: Cand | null = null;
 			const opts = subs.length ? subs : [null];
 			for (const sb of opts)
-				for (const pol of sb ? pols : [1]) {
-					const ac = acousticParts(L, R, sb ? sb.tf : null, r.gK, r.gS, pol);
-					const parts = { ...ac, simetria: 0.65 * wc.sideAsym + 0.35 * ac.simetria, paredes: wc.near };
-					const sc = totalScore(parts, r.weights);
+				for (const invert of sb ? pols : [r.start.invert]) {
+					const settings = { ...r.start, invert };
+					const tf = { L, R, S: sb ? sb.tf : null };
+					const { score: sc, parts } = scoreWith(tf, wall, settings);
 					if (!best || sc > best.score)
-						best = { score: sc, listener: P, facing, dist, khL, khR, sub: sb ? sb.pos : null, subInvert: pol < 0, parts };
+						best = { score: sc, listener: P, facing, dist, aperture, khL, khR, sub: sb ? sb.pos : null, settings, parts, tf, wall };
 				}
 			return best!;
 		};
-		let bestHere: OptConfig | null = null;
+		const pols = canInvert ? [false, true] : [r.start.invert];
+		const here: Cand[] = [];
 		pairs.forEach((p, i) => {
 			const mid = [(p.khL[0] + p.khR[0]) / 2, (p.khL[2] + p.khR[2]) / 2];
 			const subs = subCands
 				.map((pos, j) => ({ pos, tf: tfs[subBase + j] }))
 				.filter(({ pos }) => (r.subMaxDist === null || Math.hypot(pos[0] - mid[0], pos[2] - mid[1]) <= r.subMaxDist) && Math.hypot(pos[0] - P[0], pos[2] - P[2]) >= 0.4);
-			const c = score(p.facing, p.dist, p.khL, p.khR, tfs[2 * i], tfs[2 * i + 1], subs);
-			configs.push(c);
-			if (!bestHere || c.score > bestHere.score) bestHere = c;
+			here.push(score(p.facing, p.dist, p.aperture, p.khL, p.khR, tfs[2 * i], tfs[2 * i + 1], subs, pols));
 		});
+		// se guardan solo los 12 mejores de esta posición (el resto de respuestas se libera)
+		here.sort((a, b) => b.score - a.score);
+		configs.push(...here.slice(0, 12));
 		if (extra) {
 			const e = extraBase;
 			const d = Math.hypot(extra.khL[0] - P[0], extra.khL[2] - P[2]);
 			const subs = extra.sub ? [{ pos: extra.sub, tf: tfs[e + 2] }] : [];
 			const mid = [(extra.khL[0] + extra.khR[0]) / 2, (extra.khL[2] + extra.khR[2]) / 2];
 			const facing = (Math.atan2(mid[0] - P[0], -(mid[1] - P[2])) * 180) / Math.PI;
-			current = score(Math.round(facing), d, extra.khL, extra.khR, tfs[e], tfs[e + 1], subs, [extra.subInvert ? -1 : 1]);
+			const ap = (2 * Math.atan2(Math.hypot(extra.khR[0] - extra.khL[0], extra.khR[2] - extra.khL[2]) / 2, Math.hypot(mid[0] - P[0], mid[1] - P[2])) * 180) / Math.PI;
+			current = score(Math.round(facing), d, Math.round(ap), extra.khL, extra.khR, tfs[e], tfs[e + 1], subs, [r.start.invert]);
 		}
-		return bestHere;
+		return here[0] ?? null;
 	}
 
 	async function test(P: V3, extra?: OptRequest['current']) {
@@ -578,7 +605,23 @@ async function doOptimize(r: OptRequest) {
 	await around(top().slice(0, 3).map((c) => c.listener), Math.min(0.2, r.step / 2));
 	phase = 'Fase 3 de 3: ajuste fino del mejor';
 	await around(top().slice(0, 1).map((c) => c.listener), Math.min(0.1, r.step / 4));
-	total = done;
 	if (ctx) destroyGrid(ctx);
-	post({ type: 'opt-done', elapsedS: (performance.now() - t0) / 1000, top: top(), current, tested });
+	// 4) ajustes del sub sobre las 40 mejores colocaciones (sin simular: solo filtros)
+	if (r.tune.length) {
+		phase = 'Afinando los ajustes del sub';
+		step(null, 0);
+		const retune = (c: Cand): Cand => {
+			const res = tuneSettings((st) => scoreWith(c.tf, c.wall, st).score, c.settings, r.tune);
+			return { ...c, scoreBefore: c.score, score: res.score, settings: res.settings, parts: scoreWith(c.tf, c.wall, res.settings).parts };
+		};
+		const tuned = topCands(40).map(retune);
+		const keep = new Set(tuned.map((c) => c.listener.join() + c.facing + c.dist + c.aperture));
+		const rest = configs.filter((c) => !keep.has(c.listener.join() + c.facing + c.dist + c.aperture));
+		configs.length = 0;
+		configs.push(...tuned, ...rest);
+		if (current) currentTuned = retune(current);
+		done++;
+	}
+	total = done;
+	post({ type: 'opt-done', elapsedS: (performance.now() - t0) / 1000, top: top(), current: strip(current), currentTuned: strip(currentTuned), tested });
 }
