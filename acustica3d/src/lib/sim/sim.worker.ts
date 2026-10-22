@@ -226,7 +226,7 @@ function planeSpectra(
 ): PlaneSpectra | null {
 	const p0 = pl[ids[0]];
 	if (!p0) return null;
-	const fHi = Math.min(250, 0.8 * fmax);
+	const fHi = 0.8 * fmax; // hasta donde la simulación es válida
 	const freqs: number[] = [];
 	for (let f = 20; f <= fHi; f *= Math.pow(2, 1 / 12)) freqs.push(f);
 	const nC = p0.ix.length, nF = freqs.length;

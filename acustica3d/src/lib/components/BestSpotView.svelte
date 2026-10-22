@@ -59,12 +59,13 @@
 		if (app.hoverCell >= 0 && app.hoverCell < sp.ix.length && app.hoverCell !== current) add(app.hoverCell, 'Bajo el ratón', '#898781');
 		if (scores.best >= 0 && scores.best !== current) add(scores.best, 'Mejor punto', BEST, true);
 		let lo = Infinity, hi = -Infinity;
-		for (const c of curves) for (let k = 0; k < f.length; k++) if (f[k] >= app.band[0] * 0.8) { lo = Math.min(lo, c.db[k]); hi = Math.max(hi, c.db[k]); }
+		for (const c of curves) for (let k = 0; k < f.length; k++) if (f[k] >= app.band[0] && f[k] <= app.band[1]) { lo = Math.min(lo, c.db[k]); hi = Math.max(hi, c.db[k]); }
 		if (!Number.isFinite(lo)) { lo = -20; hi = 10; }
 		const ymax = Math.ceil((hi + 3) / 5) * 5;
 		const ymin = Math.min(ymax - 20, Math.floor((lo - 3) / 5) * 5);
-		const shade = { f: [Math.max(f[0], app.band[0]), Math.min(f[f.length - 1], app.band[1])], lo: [ymin, ymin], hi: [ymax, ymax], label: 'Rango que cuenta' };
-		return { curves, ymin, ymax, shade, xmin: f[0], xmax: f[f.length - 1] };
+		// el eje es el rango que cuenta; si llega más arriba que lo simulado, esa parte sale en gris
+		const xmin = app.band[0], xmax = Math.max(app.band[1], xmin * 1.5);
+		return { curves, ymin, ymax, xmin, xmax, noDataFrom: f[f.length - 1] < xmax ? f[f.length - 1] : null };
 	});
 
 	// geometría del dibujo del mapa (para pasar del ratón a la celda)
@@ -222,7 +223,7 @@
 	<div class="flex min-h-[220px] flex-col">
 		{#if live}
 			<div class="min-h-0 flex-1">
-				<ResponseChart curves={live.curves} band={live.shade} xmin={live.xmin} xmax={live.xmax} ymin={live.ymin} ymax={live.ymax} yLabel="dB (0 = 1 altavoz a 1 m)" />
+				<ResponseChart curves={live.curves} xmin={live.xmin} xmax={live.xmax} noDataFrom={live.noDataFrom} ymin={live.ymin} ymax={live.ymax} yLabel="dB (0 = 1 altavoz a 1 m)" />
 			</div>
 			<p class="mt-1 text-[11px] text-muted">En directo: arrastra el oyente en el mapa o en 3D y la curva cambia al momento (sale de los datos ya simulados). Graves del sistema completo L+R{app.sub.enabled ? '+sub' : ''}, sin suavizar.</p>
 		{/if}

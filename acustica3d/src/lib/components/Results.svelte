@@ -134,7 +134,7 @@
 				<p class="mb-2 rounded-md bg-[#fab219]/15 px-3 py-1.5 text-xs text-ink">Has movido el oyente desde la última simulación: esta curva es la del punto anterior. La del punto nuevo la tienes al instante en «Mejor posición»; para el detalle completo pulsa «Simular ahora».</p>
 			{/if}
 			<div class="grid h-full min-h-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-				<ResponseChart curves={resp.curves} band={resp.band} xmin={fLo} xmax={fHi} ymin={-30} ymax={15} yLabel="Nivel relativo (dB)" />
+				<ResponseChart curves={resp.curves} band={resp.band} xmin={app.band[0]} xmax={Math.max(app.band[1], app.band[0] * 1.5)} noDataFrom={fHi < app.band[1] ? fHi : null} ymin={-30} ymax={15} yLabel="Nivel relativo (dB)" />
 				<div class="space-y-2 overflow-y-auto text-xs">
 					<div class="rounded-md border border-line p-2.5">
 						<div class="text-muted">Desviación del grave (30–{Math.round(fHi)} Hz), punto central</div>

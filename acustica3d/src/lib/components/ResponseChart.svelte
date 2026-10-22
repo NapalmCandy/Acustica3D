@@ -17,8 +17,10 @@
 		ymin?: number;
 		ymax?: number;
 		yLabel?: string;
+		/** por encima de esta frecuencia no hay datos simulados (se marca en gris) */
+		noDataFrom?: number | null;
 	}
-	let { curves, band = null, xmin, xmax, ymin = -30, ymax = 20, yLabel = 'Nivel (dB)' }: Props = $props();
+	let { curves, band = null, xmin, xmax, ymin = -30, ymax = 20, yLabel = 'Nivel (dB)', noDataFrom = null }: Props = $props();
 
 	let w = $state(600);
 	let h = $state(280);
@@ -27,7 +29,7 @@
 	const Y = (d: number) => m.t + ((ymax - Math.max(ymin, Math.min(ymax, d))) / (ymax - ymin)) * (h - m.t - m.b);
 	const path = (f: number[], d: number[]) =>
 		f.map((ff, i) => (ff >= xmin && ff <= xmax ? `${i === 0 || f[i - 1] < xmin ? 'M' : 'L'}${X(ff).toFixed(1)},${Y(d[i]).toFixed(1)}` : '')).join('');
-	const xticks = $derived([10, 20, 30, 40, 50, 60, 80, 100, 150, 200, 300, 400, 500].filter((t) => t >= xmin && t <= xmax));
+	const xticks = $derived([10, 20, 30, 40, 50, 60, 80, 100, 150, 200, 300, 400, 500, 700, 1000].filter((t) => t >= xmin && t <= xmax));
 	const yticks = $derived.by(() => {
 		const out: number[] = [];
 		for (let v = Math.ceil(ymin / 5) * 5; v <= ymax; v += 5) out.push(v);
@@ -41,6 +43,7 @@
 		hoverF = Math.pow(10, Math.log10(xmin) + ((x - m.l) / (w - m.l - m.r)) * (Math.log10(xmax) - Math.log10(xmin)));
 	}
 	const valueAt = (c: Curve, f: number) => {
+		if (f > c.f[c.f.length - 1] || f < c.f[0]) return NaN;
 		let i = c.f.findIndex((ff) => ff >= f);
 		if (i <= 0) i = 1;
 		const t = (f - c.f[i - 1]) / (c.f[i] - c.f[i - 1]);
@@ -79,6 +82,10 @@
 					fill="rgba(42,120,214,0.16)"
 				/>
 			{/if}
+			{#if noDataFrom !== null && noDataFrom < xmax}
+				<rect x={X(Math.max(xmin, noDataFrom))} y={m.t} width={w - m.r - X(Math.max(xmin, noDataFrom))} height={h - m.t - m.b} fill="var(--c-grid)" opacity="0.55" />
+				<text x={(X(Math.max(xmin, noDataFrom)) + w - m.r) / 2} y={m.t + 16} text-anchor="middle" font-size="10" fill="var(--c-muted)">sin datos</text>
+			{/if}
 			{#each curves as c}
 				<path d={path(c.f, c.db)} fill="none" stroke={c.color} stroke-width="2" stroke-dasharray={c.dash ? '5 4' : ''} stroke-linejoin="round" />
 			{/each}
@@ -91,7 +98,7 @@
 				style="left:{Math.min(X(hoverF) + 10, w - 170)}px">
 				<div class="font-semibold text-ink">{hoverF.toFixed(1)} Hz</div>
 				{#each curves as c}
-					<div class="flex items-center gap-1.5 text-ink"><span class="inline-block h-2 w-2 rounded-full" style="background:{c.color}"></span>{c.label}: {valueAt(c, hoverF).toFixed(1)} dB</div>
+					<div class="flex items-center gap-1.5 text-ink"><span class="inline-block h-2 w-2 rounded-full" style="background:{c.color}"></span>{c.label}: {Number.isFinite(valueAt(c, hoverF)) ? `${valueAt(c, hoverF).toFixed(1)} dB` : 'sin datos'}</div>
 				{/each}
 			</div>
 		{/if}

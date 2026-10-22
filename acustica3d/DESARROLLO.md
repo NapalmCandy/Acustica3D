@@ -79,6 +79,10 @@ Prueba de extremo a extremo en Chromium: `node testdata/e2e.mjs URL gpu|cpu`. Co
 
 ## Historial de cambios
 
+### v0.7.3
+- Las gráficas de respuesta («Mejor posición» y «Respuesta») van del «Desde» al «Hasta» elegidos; lo que pase de la frecuencia simulada sale en gris («sin datos»).
+- El mapa de «Mejor posición» ya no se corta en 250 Hz: llega hasta el 80 % de la frecuencia máxima simulada.
+
 ### v0.7.2
 - KH a la altura del punto medio entre tweeter y woofer (sacado de las rejillas dibujadas; si no, 12,5 cm bajo lo alto de la caja) y oído 5 cm por debajo y 8 cm por detrás de los ojos.
 - La pantalla del ordenador ya no se quita: material «Pantalla / plástico duro» (refleja; importa en medios y agudos).
