@@ -45,7 +45,15 @@ jobs:
 
       - name: Compilador para Windows
         if: steps.ver.outputs.nueva == 'si'
-        run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64 zip
+        timeout-minutes: 12
+        # a veces el servidor de paquetes se queda colgado: tiempo límite por intento y un reintento
+        run: |
+          for i in 1 2; do
+            timeout 300 sudo apt-get update -o Acquire::Retries=3 \
+              && timeout 300 sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64 zip && exit 0
+            echo "Reintentando la instalación ($i)…"
+          done
+          exit 1
 
       - name: Pruebas y compilación web
         if: steps.ver.outputs.nueva == 'si'
