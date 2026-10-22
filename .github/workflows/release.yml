@@ -1,7 +1,10 @@
 # Publica una versión de Acustica3D cuando cambia "version" en acustica3d/package.json en main
-# (o a mano desde la pestaña Actions): pruebas → compilación web → Acustica3D.exe (MinGW) →
-# release vX.Y.Z con el .zip (descarga manual) y el .pack (lo usa el actualizador de Acustica3D.exe).
-# Si ya existe la release de esa versión, no hace nada.
+# (o a mano desde la pestaña Actions). Si ya existe la release de esa versión, no hace nada.
+#   1. version   lee la versión y comprueba si ya está publicada
+#   2. exe       compila Acustica3D.exe en Windows (MinGW de MSYS2: no depende de los servidores de
+#                paquetes de Ubuntu, que a veces se quedan colgados)
+#   3. publicar  pruebas, compilación web, paquetes (.zip para descargar a mano y .pack para el
+#                actualizador automático) y release vX.Y.Z
 name: Publicar versión de Acustica3D
 
 on:
@@ -14,21 +17,20 @@ permissions:
   contents: write
 
 jobs:
-  publicar:
+  version:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: acustica3d
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      nueva: ${{ steps.ver.outputs.nueva }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Versión de package.json
         id: ver
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          VERSION=$(node -p "require('./acustica3d/package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             echo "La release v$VERSION ya existe: nada que publicar."
             echo "nueva=no" >> "$GITHUB_OUTPUT"
@@ -36,43 +38,61 @@ jobs:
             echo "nueva=si" >> "$GITHUB_OUTPUT"
           fi
 
+  exe:
+    needs: version
+    if: needs.version.outputs.nueva == 'si'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: mingw-w64-x86_64-gcc
+      - name: Acustica3D.exe
+        run: >
+          gcc -O2 -Wall -mwindows -static -DAPP_VERSION="\"${{ needs.version.outputs.version }}\""
+          -o acustica3d/launcher/Acustica3D.exe acustica3d/launcher/acustica3d.c -lws2_32 -lshell32 -ladvapi32 -lwinhttp
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exe
+          path: acustica3d/launcher/Acustica3D.exe
+          if-no-files-found: error
+
+  publicar:
+    needs: [version, exe]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: acustica3d
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        if: steps.ver.outputs.nueva == 'si'
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: acustica3d/package-lock.json
-
-      - name: Compilador para Windows
-        if: steps.ver.outputs.nueva == 'si'
-        timeout-minutes: 12
-        # a veces el servidor de paquetes se queda colgado: tiempo límite por intento y un reintento
-        run: |
-          for i in 1 2; do
-            timeout 300 sudo apt-get update -o Acquire::Retries=3 \
-              && timeout 300 sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64 zip && exit 0
-            echo "Reintentando la instalación ($i)…"
-          done
-          exit 1
-
       - name: Pruebas y compilación web
-        if: steps.ver.outputs.nueva == 'si'
         run: |
           npm ci
           npx svelte-kit sync
           npx svelte-check --threshold error
           npx vitest run
           npm run build
-
-      - name: Acustica3D.exe y paquetes
-        if: steps.ver.outputs.nueva == 'si'
-        run: |
-          x86_64-w64-mingw32-gcc -O2 -Wall -mwindows -static -DAPP_VERSION="\"$VERSION\"" \
-            -o launcher/Acustica3D.exe launcher/acustica3d.c -lws2_32 -lshell32 -ladvapi32 -lwinhttp
-          node scripts/package.mjs "$VERSION"
-
+      - uses: actions/download-artifact@v4
+        with:
+          name: exe
+          path: acustica3d/launcher
+      - name: Paquetes
+        run: node scripts/package.mjs "$VERSION"
       - uses: softprops/action-gh-release@v2
-        if: steps.ver.outputs.nueva == 'si'
         with:
           tag_name: v${{ env.VERSION }}
           target_commitish: ${{ github.sha }}
