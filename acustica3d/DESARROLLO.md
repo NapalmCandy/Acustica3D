@@ -79,6 +79,18 @@ Prueba de extremo a extremo en Chromium: `node testdata/e2e.mjs URL gpu|cpu`. Co
 
 ## Historial de cambios
 
+### v0.7
+- **Lo dibujado en el .skp se reconoce** (`geometry/scene.ts`, con los grupos que ahora devuelve `skp.ts`):
+  - KH dibujados → se quitan de la geometría y sus posiciones (woofer: 18 cm bajo lo más alto) pasan a ser las de los KH; persona y silla → se quitan y la cabeza (ojos, 8 cm hacia atrás) es la posición de escucha; el sub va al suelo bajo el KH izquierdo; la pantalla del PC se quita.
+  - Trampas y paneles de lana (grupos enteros de material poroso, de tamaño de mueble) → objetos movibles con **su forma exacta** (`RoomObject.mesh`, en ejes locales), su grosor, su cámara de aire (rayo hasta la superficie más cercana) y la densidad del nombre del material («80kg/m3») o de la ficha del producto (`POROUS_PRODUCTS`: Sonorock Eco 30 kg/m³, AFr5). En diagonal en una esquina → «Trampa de esquina»; si no, «Panel». Pueden ir girados en Y e inclinados en X (`rotX`).
+  - Paredes y techos por capas: a la capa que da al aire se le pone el material según lo que tiene detrás: pladur + lana → trasdosado con lana; pladur + cámara vacía → `pladur_camara` (nuevo); pladur con capas encima → falso techo con plénum.
+- **Casilla «cuenta» en cada material**: desmarcada, el material es acústicamente transparente (p. ej. la mesa provisional), y al marcarla vuelve el que tenía.
+- **Colocación automática con tratamiento** (`sim/treatment.ts`, casilla «Mover también trampas y paneles»):
+  - Los paneles planos van a los puntos de primera reflexión de los KH (paredes laterales, por el método de la imagen) y al techo entre las dos reflexiones; conservan su cámara de aire.
+  - Huecos para las trampas: sus posturas actuales y la misma pieza girada (nunca reflejada) a las cuatro esquinas, a todas las alturas, y a lo largo de las aristas pared-techo y pared-suelo. Se descartan los que no caben en el aire de la sala vacía.
+  - Con las dos mejores posiciones de escucha: cuánto aporta una trampa más en cada hueco libre y cuánto se pierde quitando cada una; se comprueban de verdad los 8 cambios más prometedores y se aceptan los que suben más de 0,3 puntos. Después, otra búsqueda bayesiana (la mitad) de la posición de escucha con el tratamiento nuevo.
+  - «Aplicar» también mueve trampas y paneles (los paneles, a las reflexiones de la fila elegida).
+
 ### v0.6
 - **Búsqueda bayesiana** en la colocación automática (`sim/bayes.ts`), ahora la opción por defecto. Un proceso gaussiano (núcleo de Matérn 5/2, hiperparámetros por verosimilitud marginal) estima la puntuación en todo el suelo a partir de las posiciones ya simuladas, y la siguiente se simula donde la mejora esperada es mayor. Empieza con unas posiciones repartidas por la sala (lejos de las paredes y entre sí). Simula `base + por m² de zona válida` posiciones según la precisión, en vez de la rejilla completa más su afinado. La rejilla sigue disponible.
 - Si el worker de la búsqueda se cae sin dar motivo, se reintenta una vez con el procesador y, si vuelve a fallar, se explica qué probar (antes solo decía «Error en la búsqueda»). Con el sub limitado a cerca de los KH, solo se simulan los sitios del sub a su alcance.

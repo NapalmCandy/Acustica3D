@@ -18,6 +18,10 @@ Se abre en su propia ventana y **se actualiza solo** cuando hay una versión nue
    - Lo que esté oculto o en etiquetas ocultas no se carga, igual que no se ve en SketchUp.
    - También acepta `.dae`, `.obj` y `.glb`.
 3. **Revisa los materiales.** Comprueba el material acústico que se ha asignado a cada superficie.
+   - Acustica3D reconoce lo que has dibujado: los altavoces (pasan a ser las fuentes), la persona y su silla (tu cabeza es la posición de escucha), y las trampas y paneles de lana (pasan a ser objetos que se pueden mover, con su forma, grosor y cámara de aire).
+   - Si escribes la densidad en el nombre del material de la lana («Lana de roca 80kg/m3») se usa esa; algunos productos se reconocen por el nombre (ROCKWOOL Sonorock Eco, Plus).
+   - En paredes y techos dibujados por capas (pladur, lana, ladrillo, forjado), la superficie toma el material según lo que tiene detrás.
+   - Desmarca «cuenta» en un material para que sea acústicamente transparente (por ejemplo, una mesa provisional) y compara.
 4. **Coloca tus altavoces, el sub y tu cabeza.** Puedes escribir coordenadas o arrastrarlos en 3D. Añade paneles, trampas de graves o muebles si quieres probarlos.
 5. **Mira los resultados.** La simulación arranca sola y se va afinando en unos segundos; si mueves algo, se recalcula.
 
@@ -31,6 +35,7 @@ Se abre en su propia ventana y **se actualiza solo** cuando hay una versión nue
   - También ajusta el sub (corte, nivel, fase y filtro de 85 Hz) y los interruptores Bass y Low-Mid de los KH 120 A.
   - Te dice cuánto ganarías sin mover nada, solo con esos ajustes.
   - Con un clic lo coloca y lo ajusta todo así.
+  - Con «Mover también trampas y paneles» lleva los paneles a los puntos de primera reflexión y prueba las trampas de esquina en otras esquinas y aristas (cada distribución es una simulación nueva, así que tarda bastante más).
 - **Respuesta:** la curva de graves en tu sitio. Distingue los picos, que se pueden recortar con ecualización, de los huecos, que no.
 - **Decaimiento:** cuánto tarda en apagarse cada frecuencia, es decir, cuánto "retumba" la sala.
 - **Mapa de la sala:** cómo se reparte cada frecuencia por la habitación, de 20 a 300 Hz. Con **Play** se ve el barrido animado.

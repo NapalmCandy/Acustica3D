@@ -7,6 +7,7 @@ import type { OptConfig, Settings } from './optimize';
 import { anim, animData, mapFMax } from '../mapAnim.svelte';
 import SimWorker from './sim.worker?worker';
 import type { V3 } from './voxel';
+import { placePanels } from './treatment';
 
 let worker: Worker | null = null;
 let mapReq = 0;
@@ -241,6 +242,7 @@ export function runOptimize(retry = false) {
 		apertures: o.apertures === 'varias' ? [50, 60, 70] : [60],
 		facings: o.facings === 'todas' ? [0, 90, 180, 270] : [curFacing],
 		subMaxDist: o.sub === 'cerca' ? 1.5 : null, step: prec.step, method: o.method, bayes: { ...prec.bayes },
+		treatment: o.treatment && inp.objects.length ? { nStatic: inp.nStatic, objects: plain(inp.objects), objMat: inp.objMat } : null,
 		current: { listener: P.listener, khL: P.khL, khR: P.khR, sub: app.sub.enabled ? P.sub : null }
 	};
 	app.opt = { ...emptyOpt(), running: true, phase: retry ? 'Se cortó el cálculo: reintentando con el procesador' : 'Preparando la sala' };
@@ -250,7 +252,10 @@ export function runOptimize(retry = false) {
 		if (m.type === 'opt-start') app.opt = { ...app.opt, footprint: { mask: m.mask, nx: m.nx, nz: m.nz, dx: m.dx, origin: m.origin }, total: m.total, engine: m.engine, nSub: m.nSub };
 		else if (m.type === 'opt-step') app.opt = { ...app.opt, done: m.done, total: m.total, phase: m.phase, frac: m.frac, testing: m.testing, tested: m.tested, top: m.top, current: m.current };
 		else if (m.type === 'opt-done') {
-			app.opt = { ...app.opt, running: false, testing: null, top: m.top, current: m.current, currentTuned: m.currentTuned, tested: m.tested, done: app.opt.total, phase: 'Terminado', elapsedS: m.elapsedS };
+			app.opt = {
+				...app.opt, running: false, testing: null, top: m.top, current: m.current, currentTuned: m.currentTuned, tested: m.tested,
+				done: app.opt.total, phase: 'Terminado', elapsedS: m.elapsedS, layout: m.layout, bounds: m.bounds, log: m.log
+			};
 			optWorker?.terminate();
 			optWorker = null;
 		} else if (m.type === 'error') app.opt = { ...app.opt, running: false, error: m.message };
@@ -280,9 +285,12 @@ export function cancelOptimize() {
 	if (app.opt.running) app.opt = { ...app.opt, running: false, testing: null, phase: 'Detenido' };
 }
 
-/** Aplica una combinación encontrada: posiciones (se vuelve a simular sola) y ajustes del sub
- *  (al instante, sin simular). */
+/** Aplica una combinación encontrada: posiciones (se vuelve a simular sola), ajustes del sub
+ *  (al instante, sin simular) y, si la búsqueda movió el tratamiento, trampas y paneles (los paneles, a
+ *  las primeras reflexiones de esta combinación). */
 export function applyConfig(c: OptConfig) {
+	const { layout, bounds } = app.opt;
+	if (layout && bounds && c !== app.opt.currentTuned) app.objects = placePanels(layout, c, bounds);
 	const r = (v: number) => Math.round(v * 1000) / 1000;
 	const rv = (p: V3): V3 => [r(p[0]), r(p[1]), r(p[2])];
 	app.positions.listener = rv(c.listener);

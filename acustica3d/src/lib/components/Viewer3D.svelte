@@ -6,6 +6,7 @@
 	import { app, type DeviceId } from '../state.svelte';
 	import { LIBRARY } from '../acoustics/materials';
 	import { mapOverlay } from '../mapOverlay.svelte';
+	import { objectLocalTris } from '../geometry/objects';
 
 	let host: HTMLDivElement;
 	let renderer: THREE.WebGLRenderer;
@@ -159,8 +160,24 @@
 				objGroup.add(m);
 			}
 			(m.material as THREE.MeshStandardMaterial).color.set(LIBRARY.find((l) => l.id === o.libId)?.color ?? '#cccccc');
-			m.scale.set(Math.max(0.02, o.size[0]), Math.max(0.02, o.size[1]), Math.max(0.02, o.size[2]));
-			m.rotation.set(0, (o.rotY * Math.PI) / 180, 0);
+			// la forma dibujada en SketchUp (si la hay) o una caja unidad escalada
+			const key = o.mesh ? `${o.mesh.length}|${o.size.join()}|${o.meshSize?.join()}` : 'caja';
+			if (m.userData.key !== key) {
+				const g = new THREE.BufferGeometry();
+				if (o.mesh) {
+					g.setAttribute('position', new THREE.Float32BufferAttribute(objectLocalTris(o).flat(2), 3));
+					g.computeVertexNormals();
+				} else g.copy(new THREE.BoxGeometry(1, 1, 1));
+				m.geometry.dispose();
+				m.geometry = g;
+				const edges = m.children[0] as THREE.LineSegments;
+				edges.geometry.dispose();
+				edges.geometry = new THREE.EdgesGeometry(g, 20);
+				m.userData.key = key;
+			}
+			if (o.mesh) m.scale.set(1, 1, 1);
+			else m.scale.set(Math.max(0.02, o.size[0]), Math.max(0.02, o.size[1]), Math.max(0.02, o.size[2]));
+			m.rotation.set(((o.rotX ?? 0) * Math.PI) / 180, (o.rotY * Math.PI) / 180, 0, 'YXZ');
 			if (gizmo.object !== m || !gizmo.dragging) m.position.set(o.pos[0], o.pos[1], o.pos[2]);
 		}
 	}

@@ -6,6 +6,8 @@
 	import { KH_EQ } from '../acoustics/speakers';
 	import type { OptConfig } from '../sim/optimize';
 	import type { V3 } from '../sim/voxel';
+	import { objectAabb, placePanels } from '../sim/treatment';
+	import type { RoomObject } from '../geometry/objects';
 
 	let canvas: HTMLCanvasElement;
 	let cw = $state(500);
@@ -82,6 +84,24 @@
 			ctx.stroke();
 			ctx.globalAlpha = 1;
 		};
+		// trampas y paneles: los de ahora (discontinuos) y dónde los deja la búsqueda
+		const drawObjs = (objs: RoomObject[], dashed: boolean) => {
+			ctx.setLineDash(dashed ? [3, 3] : []);
+			for (const o of objs) {
+				const b = objectAabb(o);
+				const [x0, y0] = toPx([b.lo[0], 0, b.lo[2]]), [x1, y1] = toPx([b.hi[0], 0, b.hi[2]]);
+				ctx.fillStyle = dashed ? 'transparent' : 'rgba(227, 200, 106, 0.75)';
+				ctx.strokeStyle = dark ? '#e3c86a' : '#8a7320';
+				ctx.lineWidth = 1;
+				if (!dashed) ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+				ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+			}
+			ctx.setLineDash([]);
+		};
+		if (opt.layout) {
+			drawObjs(app.objects, true);
+			drawObjs(shown && opt.bounds && shown !== opt.currentTuned ? placePanels(opt.layout, shown, opt.bounds) : opt.layout, false);
+		} else if (app.objects.length) drawObjs(app.objects, false);
 		// tu colocación actual (tenue, discontinua) y la combinación elegida
 		if (opt.current) drawConfig(opt.current, 0.45, true);
 		if (shown) drawConfig(shown, 1, false);
@@ -178,6 +198,7 @@
 				{#if KH_EQ.enabled}
 					<label class="col-span-3 flex items-center gap-2"><input type="checkbox" bind:checked={app.optOptions.tuneKh} disabled={opt.running} /> Ajustar los interruptores Bass y Low-Mid de los KH</label>
 				{/if}
+				<label class="col-span-3 flex items-center gap-2"><input type="checkbox" bind:checked={app.optOptions.treatment} disabled={opt.running || !app.objects.length} /> Mover también trampas y paneles{app.objects.length ? ` (${app.objects.length} objetos; bastante más lento)` : ' (no hay ninguno en «Objetos»)'}</label>
 			</div>
 			<div class="mt-2 flex gap-2">
 				{#if opt.running}
@@ -194,8 +215,12 @@
 				{/if}
 				Para cada posición, los KH a {fmt(Math.max(0.8, app.listenRange[0]), 1)}–{fmt(Math.min(2, app.listenRange[1]), 1)} m (cada 10 cm) {app.optOptions.apertures === 'varias' ? 'con aperturas de 50°, 60° y 70°' : 'en triángulo equilátero'}, {app.optOptions.facings === 'todas' ? 'mirando hacia cada pared' : 'con tu orientación actual'}{app.sub.enabled ? ', el sub en cada punto del suelo y su fase 0°/180°' : ''}.
 				{#if app.sub.enabled && app.optOptions.tuneSub}Después afina el corte, el nivel y el filtro de 85 Hz del sub en las 40 mejores colocaciones.{/if}
+				{#if app.optOptions.treatment && app.objects.length}Con el tratamiento: lleva los paneles planos a los puntos de primera reflexión y prueba cada trampa de esquina en las otras esquinas y en las aristas pared-techo y pared-suelo (cada distribución es una simulación nueva); después vuelve a buscar la posición de escucha.{/if}
 				Puntúa con el rango de frecuencias ({app.band[0]}–{app.band[1]} Hz) y los pesos de «Mejor posición». Las paredes, el escritorio y los objetos se respetan.
 			</p>
+			{#if opt.log.length}
+				<ul class="mt-1.5 list-disc space-y-0.5 pl-4 text-ink" id="opt-log">{#each opt.log as l}<li>{l}</li>{/each}</ul>
+			{/if}
 			{#if opt.error}<p id="opt-error" class="mt-1 rounded bg-red-500/10 px-2 py-1 text-red-700 dark:text-red-300">{opt.error}</p>{/if}
 		</div>
 

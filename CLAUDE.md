@@ -27,7 +27,7 @@ Idioma de trabajo: **español**. El usuario produce hardcore/gabber, escucha alt
 
 ## Acustica3D: puntos clave
 - **Desarrollo:**
-  - `npm install` (`.npmrc` con legacy-peer-deps), `npm run dev`, `npx vitest run` (30 pruebas), `npm run build`.
+  - `npm install` (`.npmrc` con legacy-peer-deps), `npm run dev`, `npx vitest run` (41 pruebas), `npm run build`.
   - Prueba completa: `node testdata/e2e.mjs http://localhost:4173/ cpu|gpu`, con `vite preview` en marcha. Reinicia preview tras cada build.
   - No uses `pkill -f` con un patrón que aparezca en la misma orden.
 - **Simulación:**
@@ -39,6 +39,9 @@ Idioma de trabajo: **español**. El usuario produce hardcore/gabber, escucha alt
 - **Colocación automática:** `sim/optimize.ts` + `doOptimize` en `sim/sim.worker.ts`. Usa la reciprocidad: una simulación por cada posición del oyente.
   - Qué posiciones del oyente se simulan: búsqueda bayesiana por defecto (`sim/bayes.ts`: proceso gaussiano + mejora esperada sobre candidatos cada 10 cm; presupuesto en `PRECISION` de `controller.ts`) o rejilla gruesa + afinado.
   - Si el worker se cae sin mensaje, `runOptimize(true)` reintenta una vez con el procesador.
+  - Con tratamiento (`sim/treatment.ts`): paneles a las primeras reflexiones; trampas a huecos (esquinas y aristas, solo giros de la pieza dibujada) con valor marginal (añadir/quitar) y 8 cambios comprobados; luego otra búsqueda bayesiana corta.
+- **Importar .skp** (`geometry/scene.ts`): reconoce KH, persona+silla, pantalla, trampas/paneles de lana (objetos con `mesh` exacta, `rotX`) y capas de paredes/techo (material de la superficie según lo de detrás). Densidad de lana del nombre o de `POROUS_PRODUCTS`.
+- **Modelo del usuario:** `Estudio_v0.0x.skp` (4,12 × 6,66 × 2,67 m; 10 trampas de esquina y 3 paneles de lana de 80 kg/m³; paredes del fondo con lana Sonorock Eco de 30 kg/m³, laterales con cámara vacía; falso techo con plénum de 36 cm). No se sube al repositorio. Mesa provisional: la quiere poder quitar/poner («cuenta»); más adelante, simulación hasta 20 kHz para diseñarla.
   - Después ajusta el Sub8 (corte, nivel, fase, filtro de 85 Hz) y los interruptores Bass/Low-Mid de los KH en las 40 mejores colocaciones, probando todas las combinaciones (`tuneSettings`).
 - **Interruptores del KH 120 A:** `KH_EQ` en `acoustics/speakers.ts`, ajustados a la gráfica del manual de Neumann (pág. 25): Bass, estante de 183 Hz y Q 0,62; Low-Mid, campana de 260 Hz y Q 0,36; Treble, estante de 5,4 kHz y Q 0,84.
 - **Mapa de la sala:** de 20 a 300 Hz, con animación precalculada (`mapAnim.svelte.ts`, `doFrames`).
@@ -58,7 +61,7 @@ Idioma de trabajo: **español**. El usuario produce hardcore/gabber, escucha alt
   - Se puede probar con `ACUSTICA3D_UPDATE_URL` y Wine.
 
 ## Pendiente / ideas
-- Usar el `.dae` real del usuario.
+- Medios y agudos hasta 20 kHz (otro apartado: reflexiones / trazado de rayos) para ver el efecto de la mesa y diseñar una útil y acústicamente buena.
 - Fase 2: reflexiones tempranas, puntos de primera reflexión y paneles.
 - Varios subs.
 - Calibración con medidas de REW.

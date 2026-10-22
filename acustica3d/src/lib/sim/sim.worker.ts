@@ -10,6 +10,8 @@ import type { Cx } from '../acoustics/speakers';
 import { wallCriteria, type PlaneSpectra, type Criterion } from '../analysis/score';
 import { khPair, acousticParts, totalScore, GainCache, tuneSettings, type PointTF, type OptConfig, type Settings } from './optimize';
 import { bayesSearch, type P2 } from './bayes';
+import { objectTris, type RoomObject } from '../geometry/objects';
+import { roomBounds, placePanels, trapSlots, atSlot, collides, isCornerTrap, type Bounds, type Slot } from './treatment';
 
 export interface LevelSpec {
 	fmax: number;
@@ -98,13 +100,21 @@ export interface OptRequest {
 	 *  según lo aprendido de las anteriores (bayes.ts), con `base + perM2 · m² de zona válida` simulaciones */
 	method: 'rejilla' | 'bayes';
 	bayes: { base: number; perM2: number; max: number };
+	/** mover también trampas y paneles: los primeros `nStatic` triángulos de `tris` son la sala fija; los
+	 *  objetos van detrás (uno por objeto, con su material `objMat`) */
+	treatment: { nStatic: number; objects: RoomObject[]; objMat: number[] } | null;
 	current: { listener: V3; khL: V3; khR: V3; sub: V3 | null };
 }
 
 export type OptMsg =
 	| { type: 'opt-start'; mask: Uint8Array; nx: number; nz: number; dx: number; origin: V3; total: number; engine: string; nSub: number }
 	| { type: 'opt-step'; done: number; total: number; phase: string; frac: number; testing: V3 | null; tested: { pos: V3; score: number }[]; top: OptConfig[]; current: OptConfig | null }
-	| { type: 'opt-done'; elapsedS: number; top: OptConfig[]; current: OptConfig | null; currentTuned: OptConfig | null; tested: { pos: V3; score: number }[] };
+	| {
+			type: 'opt-done'; elapsedS: number; top: OptConfig[]; current: OptConfig | null; currentTuned: OptConfig | null; tested: { pos: V3; score: number }[];
+			/** con tratamiento: dónde quedan trampas y paneles, la caja de la sala (para recolocar los paneles
+			 *  al aplicar otra fila) y qué se ha cambiado */
+			layout: RoomObject[] | null; bounds: Bounds | null; log: string[];
+	  }
 
 /** Candidato interno: además de la combinación, sus respuestas (para afinar los ajustes sin simular). */
 type Cand = OptConfig & { tf: { L: PointTF; R: PointTF; S: PointTF | null }; wall: { sideAsym: number; near: number } };
@@ -431,8 +441,9 @@ async function doOptimize(r: OptRequest) {
 	const t0 = performance.now();
 	const geo = { tris: r.tris, triMat: r.triMat };
 	const dx = 343 / (r.fmax * r.ppw);
-	const grid = voxelize(geo, dx, r.seed);
-	const prep = prepare(grid, geo, r.betaByMat);
+	const T = r.treatment;
+	let grid = voxelize(geo, dx, r.seed);
+	let prep = prepare(grid, geo, r.betaByMat);
 	const cellAt = (p: V3) => [0, 1, 2].map((k) => Math.floor((p[k] - grid.origin[k]) / dx)) as V3;
 	const airAt = (p: V3) => {
 		const [x, y, z] = cellAt(p);
@@ -519,7 +530,7 @@ async function doOptimize(r: OptRequest) {
 	const canInvert = r.tune.includes('invert');
 
 	/** Simula con la fuente en la cabeza y puntúa todas las combinaciones de KH y sub. */
-	async function evaluate(P: V3, extra?: OptRequest['current']): Promise<OptConfig | null> {
+	async function evaluate(P: V3, extra?: OptRequest['current']): Promise<Cand[]> {
 		const pairs: { facing: number; dist: number; aperture: number; khL: V3; khR: V3 }[] = [];
 		for (const facing of r.facings)
 			for (const aperture of r.apertures)
@@ -537,7 +548,7 @@ async function doOptimize(r: OptRequest) {
 		receivers.push(...subHere);
 		const extraBase = receivers.length;
 		if (extra) receivers.push(extra.khL, extra.khR, ...(extra.sub ? [extra.sub] : []));
-		if (!pairs.length && !extra) return null;
+		if (!pairs.length && !extra) return [];
 		const args = {
 			source: P, receivers, durationS: r.durationS, fmax: r.fmax, planeY: null,
 			onProgress: (f: number) => { if (Math.random() < 0.1) step(P, f); }
@@ -582,7 +593,7 @@ async function doOptimize(r: OptRequest) {
 		});
 		// se guardan solo los 12 mejores de esta posición (el resto de respuestas se libera)
 		here.sort((a, b) => b.score - a.score);
-		configs.push(...here.slice(0, 12));
+		here.length = Math.min(here.length, 12);
 		if (extra) {
 			const e = extraBase;
 			const d = Math.hypot(extra.khL[0] - P[0], extra.khL[2] - P[2]);
@@ -592,7 +603,7 @@ async function doOptimize(r: OptRequest) {
 			const ap = (2 * Math.atan2(Math.hypot(extra.khR[0] - extra.khL[0], extra.khR[2] - extra.khL[2]) / 2, Math.hypot(mid[0] - P[0], mid[1] - P[2])) * 180) / Math.PI;
 			current = score(Math.round(facing), d, Math.round(ap), extra.khL, extra.khR, tfs[e], tfs[e + 1], subs, [r.start.invert]);
 		}
-		return here[0] ?? null;
+		return here;
 	}
 
 	/** Simula una posición de escucha; devuelve su mejor puntuación (null si no cabe ninguna colocación). */
@@ -604,7 +615,9 @@ async function doOptimize(r: OptRequest) {
 		}
 		testedKeys.add(k);
 		step(P, 0);
-		const b = await evaluate(P, extra);
+		const here = await evaluate(P, extra);
+		configs.push(...here);
+		const b = here[0] ?? null;
 		if (b) tested.push({ pos: P, score: b.score });
 		done++;
 		step(null, 1);
@@ -649,6 +662,140 @@ async function doOptimize(r: OptRequest) {
 		phase = 'Fase 3 de 3: ajuste fino del mejor';
 		await around(top().slice(0, 1).map((c) => c.listener), Math.min(0.1, r.step / 4));
 	}
+
+	// 3) tratamiento: paneles a las primeras reflexiones y trampas de esquina a los mejores huecos
+	let layout: RoomObject[] | null = null;
+	let bounds: Bounds | null = null;
+	const log: string[] = [];
+	if (T && T.objects.length && configs.length) bounds = roomBounds(r.tris, T.nStatic, curP);
+	if (T && bounds && configs.length) {
+		type Placed = { o: RoomObject; mat: number };
+		const geoOf = (list: Placed[]) => {
+			const nS = T.nStatic;
+			const pos: number[] = Array.from(r.tris.subarray(0, nS * 9));
+			const mat: number[] = Array.from(r.triMat.subarray(0, nS));
+			for (const { o, mat: m } of list) {
+				const t = objectTris(o);
+				pos.push(...t.positions);
+				for (let k = 0; k < t.materials.length; k++) mat.push(m);
+			}
+			return { tris: Float32Array.from(pos), triMat: Int32Array.from(mat) };
+		};
+		const useLayout = (list: Placed[]) => {
+			const g = geoOf(list);
+			grid = voxelize(g, dx, r.seed);
+			prep = prepare(grid, g, r.betaByMat);
+			if (ctx) {
+				destroyGrid(ctx);
+				try {
+					ctx = uploadGrid(device!, prep);
+				} catch {
+					ctx = null;
+				}
+			}
+		};
+		const fmtP = (p: V3) => `X ${p[0].toFixed(2).replace('.', ',')} · Y ${(-p[2]).toFixed(2).replace('.', ',')} · Z ${p[1].toFixed(2).replace('.', ',')}`;
+		let placed: Placed[] = placePanels(T.objects, topCands(1)[0], bounds).map((o, i) => ({ o, mat: T.objMat[i] }));
+		const moved = placed.filter((p, i) => Math.hypot(...([0, 1, 2].map((k) => p.o.pos[k] - T.objects[i].pos[k]) as [number, number, number])) > 0.05);
+		for (const p of moved) log.push(`${p.o.name}: a la primera reflexión (${fmtP(p.o.pos)}).`);
+
+		// huecos para las trampas: dentro del aire de la sala vacía (ni en la mesa ni en las paredes)
+		const emptyGrid = voxelize(geoOf([]), dx, r.seed);
+		const inAir = (p: V3) => {
+			const c = [0, 1, 2].map((k) => Math.floor((p[k] - emptyGrid.origin[k]) / dx));
+			if (c.some((v, k) => v < 0 || v >= [emptyGrid.nx, emptyGrid.ny, emptyGrid.nz][k])) return false;
+			return emptyGrid.air[c[0] + emptyGrid.nx * (c[1] + emptyGrid.ny * c[2])] === 1;
+		};
+		const fits = (o: RoomObject) => {
+			const t = objectTris({ ...o, size: o.size.map((v) => v * 0.7) as V3 }).positions;
+			for (let i = 0; i < t.length; i += 3) if (!inAir([t[i], t[i + 1], t[i + 2]])) return false;
+			return inAir(o.pos);
+		};
+		const trapIdx = placed.map((p, i) => (isCornerTrap(p.o) ? i : -1)).filter((i) => i >= 0);
+		const traps = trapIdx.map((i) => placed[i].o);
+		const near = (a: V3, b: V3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 0.05;
+		const slots: Slot[] = trapSlots(traps, bounds).filter((sl) => traps.some((t) => near(t.pos, sl.pos)) || fits(atSlot(traps[0], sl)));
+		// las mismas dos mejores posiciones de escucha para comparar todas las distribuciones
+		const lis: V3[] = [];
+		for (const c of topCands(10))
+			if (lis.every((p) => Math.hypot(p[0] - c.listener[0], p[2] - c.listener[2]) > 0.3)) {
+				lis.push(c.listener);
+				if (lis.length === 2) break;
+			}
+		const evalLayout = async (list: Placed[]) => {
+			useLayout(list);
+			let best = -Infinity;
+			for (const P of lis) {
+				step(P, 0);
+				const here = await evaluate(P);
+				if (here[0]) best = Math.max(best, here[0].score);
+				done++;
+				step(null, 1);
+				await new Promise((res) => setTimeout(res, 0));
+			}
+			return best;
+		};
+		if (traps.length && slots.length > traps.length) {
+			const occ = trapIdx.map((i) => slots.findIndex((sl) => near(sl.pos, placed[i].o.pos)));
+			const free = () => slots.map((_, j) => j).filter((j) => !occ.includes(j));
+			const withTrapAt = (k: number, j: number): Placed[] => placed.map((p, i) => (i === trapIdx[k] ? { ...p, o: atSlot(p.o, slots[j]) } : p));
+			const ok = (list: Placed[]) => list.every((p) => !collides(p.o, list.map((q) => q.o)));
+			const nFree = free().length;
+			total += lis.length * (1 + nFree + traps.length + 8);
+			phase = 'Tratamiento: probando la distribución actual de las trampas';
+			let base = await evalLayout(placed);
+			// cuánto aporta cada hueco libre con una trampa más y cuánto se pierde al quitar cada una
+			phase = 'Tratamiento: cuánto aporta cada hueco libre';
+			const gainAdd = new Map<number, number>();
+			for (const j of free()) {
+				const extra: Placed = { o: { ...atSlot(traps[0], slots[j]), id: 'prueba' }, mat: placed[trapIdx[0]].mat };
+				const list = [...placed, extra];
+				gainAdd.set(j, ok(list) ? (await evalLayout(list)) - base : -Infinity);
+			}
+			phase = 'Tratamiento: cuánto aporta cada trampa donde está';
+			const lossRem = new Map<number, number>();
+			for (let k = 0; k < traps.length; k++) lossRem.set(k, base - (await evalLayout(placed.filter((_, i) => i !== trapIdx[k]))));
+			// cambios más prometedores (lo que gana el hueco nuevo menos lo que pierde el viejo), comprobados de verdad
+			phase = 'Tratamiento: comprobando los mejores cambios';
+			const moves: { k: number; j: number; est: number }[] = [];
+			for (let k = 0; k < traps.length; k++) for (const j of free()) moves.push({ k, j, est: (gainAdd.get(j) ?? -Infinity) - (lossRem.get(k) ?? 0) });
+			moves.sort((a, b) => b.est - a.est);
+			let tries = 0;
+			for (const m of moves) {
+				if (tries >= 8 || m.est < -1) break;
+				if (occ.includes(m.j)) continue;
+				const list = withTrapAt(m.k, m.j);
+				if (!ok(list)) continue;
+				tries++;
+				const sc = await evalLayout(list);
+				if (sc > base + 0.3) {
+					log.push(`${placed[trapIdx[m.k]].o.name}: ${slots[occ[m.k]].kind} (${fmtP(slots[occ[m.k]].pos)}) → ${slots[m.j].kind} (${fmtP(slots[m.j].pos)}), +${(sc - base).toFixed(1).replace('.', ',')} puntos.`);
+					placed = list;
+					occ[m.k] = m.j;
+					base = sc;
+				}
+			}
+			done = Math.min(done, total);
+			if (!log.some((l) => l.includes('→'))) log.push('Las trampas de esquina ya están en los mejores huecos probados: no se mueven.');
+		}
+		// 4) con el tratamiento nuevo, otra búsqueda (más corta) de la posición de escucha
+		useLayout(placed);
+		configs.length = 0;
+		tested.length = 0;
+		testedKeys.clear();
+		const budget2 = Math.max(8, Math.round(budget / 2));
+		total += lis.length + budget2;
+		phase = 'Con el tratamiento nuevo: buscando otra vez la posición de escucha';
+		const taken: { p: P2; y: number }[] = [];
+		for (const P of lis) {
+			const y = await test(P);
+			if (y !== null) taken.push({ p: [P[0], P[2]], y });
+		}
+		const cands2: P2[] = bayesCands.length ? bayesCands : listenerGrid(BAYES_H, BAYES_H / 2).map((p) => [p[0], p[2]]);
+		await bayesSearch(cands2, async ([x, z]) => test([x, r.listenerY, z]), { budget: budget2, nInit: Math.max(3, Math.round(budget2 / 3)), taken });
+		// los paneles, a las primeras reflexiones de la colocación final
+		layout = placePanels(placed.map((p) => p.o), topCands(1)[0], bounds);
+	}
 	if (ctx) destroyGrid(ctx);
 	// 4) ajustes del sub sobre las 40 mejores colocaciones (sin simular: solo filtros)
 	if (r.tune.length) {
@@ -667,5 +814,5 @@ async function doOptimize(r: OptRequest) {
 		done++;
 	}
 	total = done;
-	post({ type: 'opt-done', elapsedS: (performance.now() - t0) / 1000, top: top(), current: strip(current), currentTuned: strip(currentTuned), tested });
+	post({ type: 'opt-done', elapsedS: (performance.now() - t0) / 1000, top: top(), current: strip(current), currentTuned: strip(currentTuned), tested, layout, bounds, log });
 }

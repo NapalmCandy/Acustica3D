@@ -10,6 +10,8 @@ export interface PorousParams {
 	thickness_mm: number; // grosor de la lana de roca
 	density_kgm3: number; // densidad nominal
 	airgap_mm: number; // cámara de aire detrás del panel
+	/** resistividad al flujo (Pa·s/m²) de la ficha del producto; si no se da, se estima por la densidad */
+	flowRes?: number;
 }
 
 export interface AcousticMaterial {
@@ -26,6 +28,9 @@ export const LIBRARY: AcousticMaterial[] = [
 	{ id: 'pladur_trasdosado', name: 'Trasdosado de pladur con lana de roca', kind: 'table',
 	  alpha: [0.25, 0.28, 0.12, 0.06, 0.05, 0.05, 0.06, 0.06], color: '#d8d4cc',
 	  note: 'Pladur 12,5–15 mm sobre perfilería con lana mineral delante del ladrillo: absorbe algo de grave por membrana.' },
+	{ id: 'pladur_camara', name: 'Trasdosado de pladur con cámara sin lana', kind: 'table',
+	  alpha: [0.12, 0.25, 0.1, 0.05, 0.04, 0.05, 0.06, 0.06], color: '#d2cec4',
+	  note: 'Pladur sobre perfilería con una cámara de aire estrecha y vacía: resuena más arriba (~100 Hz) y con menos amortiguación que con lana.' },
 	{ id: 'falso_techo_pladur', name: 'Falso techo de pladur (con plénum)', kind: 'table',
 	  alpha: [0.2, 0.22, 0.1, 0.05, 0.04, 0.05, 0.05, 0.05], color: '#ecebe6',
 	  note: 'Placa continua suspendida: membrana en graves.' },
@@ -54,6 +59,27 @@ export const LIBRARY: AcousticMaterial[] = [
 
 export const RHO = 1.204;
 export const C0 = 343.0;
+
+/** Lanas con ficha técnica conocida, por el nombre del material de SketchUp: densidad nominal y
+ *  resistividad al flujo (AFr de la ficha, EN 29053). La AFr es un mínimo declarado: se usa algo por
+ *  encima, que es lo típico medido para esas densidades. */
+export const POROUS_PRODUCTS: { re: RegExp; name: string; density_kgm3: number; flowRes: number }[] = [
+	// ROCKWOOL España, ficha de abril de 2023: 30 kg/m³, AFr5
+	{ re: /sonorock[ _-]*(eco|kraft)/i, name: 'ROCKWOOL Sonorock Eco/Kraft', density_kgm3: 30, flowRes: 6000 },
+	// 50 kg/m³, AFr15
+	{ re: /sonorock[ _-]*plus/i, name: 'ROCKWOOL Sonorock Plus', density_kgm3: 50, flowRes: 16000 }
+];
+
+/** Densidad y resistividad de una lana por el nombre de su material (si es un producto conocido). */
+export function porousProduct(name: string): { density_kgm3: number; flowRes?: number; name: string } | null {
+	// la densidad escrita en el nombre («Lana de roca 80kg/m3») manda sobre la del producto
+	const m = /(\d{2,3}(?:[.,]\d)?)\s*kg(?:\s*\/?\s*m(?:3|³))?/i.exec(name);
+	if (m) {
+		const density_kgm3 = parseFloat(m[1].replace(',', '.'));
+		if (density_kgm3 >= 10 && density_kgm3 <= 250) return { name: `lana de ${density_kgm3} kg/m³`, density_kgm3 };
+	}
+	return POROUS_PRODUCTS.find((p) => p.re.test(name)) ?? null;
+}
 
 /** Resistividad al flujo de la lana de roca según densidad (Pa·s/m²), interpolación log-log [estimada]. */
 export function flowResistivity(density: number): number {
@@ -92,7 +118,7 @@ const ctan = (a: C): C => {
 
 /** Impedancia superficial normalizada (Z/ρc) de un panel poroso (Miki) con cámara de aire, reacción local. */
 export function porousSurfaceImpedance(f: number, p: PorousParams): C {
-	const sigma = flowResistivity(p.density_kgm3);
+	const sigma = p.flowRes ?? flowResistivity(p.density_kgm3);
 	const X = f / sigma;
 	const w = 2 * Math.PI * f;
 	const zc = c(1 + 0.0699 * Math.pow(X, -0.632), -0.1071 * Math.pow(X, -0.632)); // Zc/ρc

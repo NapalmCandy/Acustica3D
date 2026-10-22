@@ -25,9 +25,18 @@ import type { NamedTris } from '../sim/testgeo';
 
 const INCH = 0.0254;
 
+/** Grupo o instancia de componente del dibujo, para reconocer objetos (altavoces, oyente, trampas…). */
+export interface SkpPart {
+	name: string; // nombre de la instancia o, si no tiene, de su definición
+	parent: number; // índice del grupo que lo contiene (−1 = raíz del modelo)
+}
+
 export interface SkpModel {
 	version: string;
 	tris: NamedTris; // metros, Y hacia arriba (como el resto de la app)
+	parts: SkpPart[];
+	/** grupo más interior de cada triángulo (−1 = suelto en la raíz) */
+	triPart: Int32Array;
 	colors: Map<string, string>; // material → color #rrggbb
 	warnings: string[];
 	stats: { faces: number; triangles: number; instances: number; hiddenSkipped: number; definitions: number };
@@ -234,7 +243,9 @@ export async function parseSkp(buf: Uint8Array): Promise<SkpModel> {
 	};
 
 	const tmp = new THREE.Vector3();
-	const visit = (ents: Node, xf: THREE.Matrix4, inherited: string, depth: number) => {
+	const parts: SkpPart[] = [];
+	const triPart: number[] = [];
+	const visit = (ents: Node, xf: THREE.Matrix4, inherited: string, depth: number, part: number) => {
 		if (depth > 64) throw new Error('Componentes anidados demasiado profundos (¿referencia circular?).');
 		const key = ents.off;
 		let topo = cache.get(key);
@@ -303,6 +314,7 @@ export async function parseSkp(buf: Uint8Array): Promise<SkpModel> {
 					out.positions.push(tmp.x * INCH, tmp.z * INCH, -tmp.y * INCH);
 				}
 				out.materials.push(name);
+				triPart.push(part);
 				stats.triangles++;
 			}
 		}
@@ -319,15 +331,16 @@ export async function parseSkp(buf: Uint8Array): Promise<SkpModel> {
 			const tm = t.child(ins, 0x1966);
 			const m = tm && tm.len >= 104 ? skpMatrix(Array.from({ length: 13 }, (_, i) => t.f64(tm, i))) : new THREE.Matrix4();
 			stats.instances++;
-			visit(def.ents, xf.clone().multiply(m), matName.get(c.mat) ?? inherited, depth + 1);
+			parts.push({ name: t.str(t.child(ins, 0x1965)) || def.name, parent: part });
+			visit(def.ents, xf.clone().multiply(m), matName.get(c.mat) ?? inherited, depth + 1, parts.length - 1);
 		}
 	};
-	visit(rootEnts, new THREE.Matrix4(), DEFAULT, 0);
+	visit(rootEnts, new THREE.Matrix4(), DEFAULT, 0, -1);
 
 	if (!stats.triangles) throw new Error('El .skp no contiene caras visibles.');
 	if (stats.hiddenSkipped)
 		warnings.push(`${stats.hiddenSkipped} elementos ocultos o en etiquetas ocultas no se han importado (como en la vista de SketchUp).`);
 	const hiddenNames = [...hiddenLayer].map((id) => layerName.get(id)).filter(Boolean);
 	if (hiddenNames.length) warnings.push(`Etiquetas ocultas: ${hiddenNames.join(', ')}.`);
-	return { version, tris: out, colors, warnings, stats };
+	return { version, tris: out, parts, triPart: Int32Array.from(triPart), colors, warnings, stats };
 }

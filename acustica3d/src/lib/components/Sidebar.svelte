@@ -31,9 +31,14 @@
 		loadError = null;
 		try {
 			const m = await importFile(f);
-			app.setModel(m.fileName, m.object, m.tris, m.materialNames, m.warnings, { min: m.bbox.min, max: m.bbox.max });
+			app.setModel(m.fileName, m.object, m.tris, m.materialNames, m.warnings, { min: m.bbox.min, max: m.bbox.max }, m.scene?.libHints, m.scene?.notes);
 			mapOverlay.current = null;
 			autoPlace();
+			// lo dibujado en el .skp manda: KH, cabeza y sub donde están, y trampas y paneles como objetos
+			if (m.scene) {
+				for (const [k, v] of Object.entries(m.scene.devices)) app.positions[k as DeviceId] = v;
+				if (m.scene.objects.length) app.objects = m.scene.objects;
+			}
 		} catch (err) {
 			loadError = err instanceof Error ? err.message : String(err);
 		} finally {
@@ -107,6 +112,7 @@
 			<dt class="text-muted">Materiales</dt><dd class="text-ink">{app.materialNames.length}</dd>
 		</dl>
 		{#each app.warnings as w}<p class="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">⚠ {w}</p>{/each}
+		{#each app.notes as n}<p class="rounded-md bg-accent/10 px-3 py-2 text-xs text-ink">{n}</p>{/each}
 	{/if}
 	<details class="text-xs text-muted">
 		<summary class="cursor-pointer">Cómo preparar el modelo en SketchUp</summary>
@@ -133,6 +139,16 @@
 					<div class="mb-1.5 flex items-center gap-2">
 						<span class="h-3 w-3 shrink-0 rounded-sm" style="background:{lib?.color}"></span>
 						<span class="truncate font-medium text-ink" title={m}>{m}</span>
+						<!-- p. ej. la mesa provisional: quitarla y ponerla para ver cuánto cambia el sonido -->
+						<label class="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted" title="Desmarcado: como si no estuviera (acústicamente transparente)">
+							<input type="checkbox" checked={a?.libId !== 'ignorar'}
+								onchange={(e) => {
+									const on = (e.currentTarget as HTMLInputElement).checked;
+									if (!on) (app.matMap[m].prevLibId = app.matMap[m].libId), (app.matMap[m].libId = 'ignorar');
+									else app.matMap[m].libId = app.matMap[m].prevLibId && app.matMap[m].prevLibId !== 'ignorar' ? app.matMap[m].prevLibId : 'madera_mueble';
+								}} />
+							cuenta
+						</label>
 					</div>
 					<select class="input w-full" bind:value={app.matMap[m].libId}
 						onchange={() => { const l = LIBRARY.find((x) => x.id === app.matMap[m].libId); if (l?.porous && !app.matMap[m].porous) app.matMap[m].porous = { ...l.porous }; }}>
@@ -141,7 +157,7 @@
 					{#if lib?.kind === 'porous' && a.porous}
 						<div class="mt-2 grid grid-cols-3 gap-2 text-xs">
 							<label>Grosor (mm)<input class="input w-full" type="number" min="10" max="400" bind:value={a.porous.thickness_mm} /></label>
-							<label>Densidad (kg/m³)<input class="input w-full" type="number" min="20" max="150" bind:value={a.porous.density_kgm3} /></label>
+							<label>Densidad (kg/m³)<input class="input w-full" type="number" min="20" max="150" bind:value={a.porous.density_kgm3} oninput={() => delete a.porous!.flowRes} /></label>
 							<label>Cámara (mm)<input class="input w-full" type="number" min="0" max="400" bind:value={a.porous.airgap_mm} /></label>
 						</div>
 					{/if}
@@ -293,7 +309,7 @@
 			{#if lib?.kind === 'porous' && o.porous}
 				<div class="mt-2 grid grid-cols-3 gap-2">
 					<label>Grosor (mm)<input class="input w-full" type="number" min="10" max="600" bind:value={o.porous.thickness_mm} /></label>
-					<label>Densidad<input class="input w-full" type="number" min="20" max="150" bind:value={o.porous.density_kgm3} /></label>
+					<label>Densidad<input class="input w-full" type="number" min="20" max="150" bind:value={o.porous.density_kgm3} oninput={() => delete o.porous!.flowRes} /></label>
 					<label>Cámara (mm)<input class="input w-full" type="number" min="0" max="400" bind:value={o.porous.airgap_mm} /></label>
 				</div>
 			{/if}

@@ -6,6 +6,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { NamedTris } from '../sim/testgeo';
 import { parseSkp } from './skp';
+import { analyzeScene, type SceneInfo } from './scene';
 
 export interface ImportedModel {
 	fileName: string;
@@ -14,6 +15,8 @@ export interface ImportedModel {
 	materialNames: string[];
 	bbox: { min: [number, number, number]; max: [number, number, number] };
 	warnings: string[];
+	/** lo reconocido en un .skp: altavoces, oyente, trampas y paneles, capas de paredes y techos */
+	scene?: Omit<SceneInfo, 'tris'>;
 }
 
 function materialName(m: THREE.Material | undefined): string {
@@ -55,10 +58,15 @@ export async function importFile(file: File): Promise<ImportedModel> {
 	const ext = name.split('.').pop()?.toLowerCase();
 	const warnings: string[] = [];
 	let object: THREE.Object3D;
+	let scene: ImportedModel['scene'];
 	if (ext === 'skp') {
 		const m = await parseSkp(new Uint8Array(await file.arrayBuffer()));
 		warnings.push(...m.warnings);
-		object = objectFromTris(m.tris, (n) => m.colors.get(n) ?? '#cccccc');
+		const { tris: kept, ...info } = analyzeScene(m.tris, m.parts, m.triPart);
+		scene = info;
+		// los materiales renombrados por sus capas («Pladur (pared con lana)») conservan el color del original
+		const base = (n: string) => n.replace(/ \(.*\)$/, '');
+		object = objectFromTris(kept, (n) => m.colors.get(n) ?? m.colors.get(base(n)) ?? '#cccccc');
 	} else if (ext === 'dae') {
 		const text = await file.text();
 		const res = new ColladaLoader().parse(text, '');
@@ -93,7 +101,8 @@ export async function importFile(file: File): Promise<ImportedModel> {
 		tris,
 		materialNames,
 		bbox: { min: [box.min.x, box.min.y, box.min.z], max: [box.max.x, box.max.y, box.max.z] },
-		warnings
+		warnings,
+		scene
 	};
 }
 

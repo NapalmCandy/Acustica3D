@@ -1,12 +1,13 @@
 // Estado global de la aplicación (Svelte 5, runas).
 import type * as THREE from 'three';
-import { LIBRARY, materialAlpha, alphaToBeta, lowFreqAlpha, type PorousParams } from './acoustics/materials';
+import { LIBRARY, materialAlpha, alphaToBeta, lowFreqAlpha, porousProduct, type PorousParams } from './acoustics/materials';
 import type { NamedTris } from './sim/testgeo';
 import type { V3 } from './sim/voxel';
 import type { Spectrum } from './dsp/analysis';
 import { objectTris, objectMaterialName, PRESETS, type RoomObject } from './geometry/objects';
 import { DEFAULT_WEIGHTS, type Criterion, type PlaneSpectra } from './analysis/score';
 import type { OptConfig } from './sim/optimize';
+import type { Bounds } from './sim/treatment';
 
 export interface OptState {
 	running: boolean;
@@ -23,12 +24,16 @@ export interface OptState {
 	footprint: { mask: Uint8Array; nx: number; nz: number; dx: number; origin: V3 } | null;
 	engine: string;
 	nSub: number;
+	/** con «mover también trampas y paneles»: dónde quedan, la caja de la sala y qué ha cambiado */
+	layout: RoomObject[] | null;
+	bounds: Bounds | null;
+	log: string[];
 	elapsedS: number | null;
 	error: string | null;
 }
 export const emptyOpt = (): OptState => ({
 	running: false, phase: '', done: 0, total: 0, frac: 0, testing: null, tested: [], top: [], current: null, currentTuned: null,
-	footprint: null, engine: '', nSub: 0, elapsedS: null, error: null
+	footprint: null, engine: '', nSub: 0, elapsedS: null, error: null, layout: null, bounds: null, log: []
 });
 
 export type DeviceId = 'khL' | 'khR' | 'sub' | 'listener';
@@ -36,6 +41,8 @@ export type DeviceId = 'khL' | 'khR' | 'sub' | 'listener';
 export interface MatAssign {
 	libId: string;
 	porous?: PorousParams;
+	/** el que tenía antes de desmarcar «cuenta» (para volver a él) */
+	prevLibId?: string;
 }
 
 export interface SimResult {
@@ -67,7 +74,7 @@ export function guessMaterial(name: string): string {
 		[/puerta|door/, 'puerta'],
 		[/mesa|escritorio|desk|mueble|estant|armario|madera|wood|mdf/, 'madera_mueble'],
 		[/sofa|sofá|sillon|sillón|couch|cama|bed/, 'sofa'],
-		[/altavoz|speaker|monitor|persona|human|cota|dimension|guide|guía/, 'ignorar']
+		[/altavoz|speaker|neumann|monitor|pantalla|screen|logo|persona|oyente|human|silla|chair|eyeball|cota|dimension|guide|guía/, 'ignorar']
 	];
 	for (const [re, id] of rules) if (re.test(n)) return id;
 	return 'pladur_trasdosado';
@@ -79,6 +86,8 @@ class AppState {
 	tris = $state.raw<NamedTris | null>(null);
 	materialNames = $state<string[]>([]);
 	warnings = $state<string[]>([]);
+	/** lo que se ha reconocido y ajustado al importar (informativo) */
+	notes = $state<string[]>([]);
 	bbox = $state<{ min: V3; max: V3 } | null>(null);
 	matMap = $state<Record<string, MatAssign>>({});
 
@@ -116,7 +125,7 @@ class AppState {
 	optOptions = $state({
 		facings: 'todas' as 'todas' | 'actual', sub: 'cualquiera' as 'cualquiera' | 'cerca', precision: 'normal' as 'rapida' | 'normal' | 'fina',
 		apertures: 'varias' as 'varias' | 'equilatero', tuneSub: true, tuneKh: true,
-		method: 'bayes' as 'bayes' | 'rejilla'
+		method: 'bayes' as 'bayes' | 'rejilla', treatment: true
 	});
 	/** celda del mapa bajo el ratón (vista previa de su respuesta), −1 = ninguna */
 	hoverCell = $state(-1);
@@ -127,7 +136,9 @@ class AppState {
 	mapFreq = $state(60);
 	mapBand = $state(true);
 
-	setModel(name: string, object: THREE.Object3D, tris: NamedTris, mats: string[], warnings: string[], bbox: { min: V3; max: V3 }) {
+	/** `hints`: material de la biblioteca ya decidido para algunos materiales (p. ej. por sus capas). */
+	setModel(name: string, object: THREE.Object3D, tris: NamedTris, mats: string[], warnings: string[], bbox: { min: V3; max: V3 }, hints: Record<string, string> = {}, notes: string[] = []) {
+		this.notes = notes;
 		this.modelName = name;
 		this.modelObject = object;
 		this.tris = tris;
@@ -137,9 +148,12 @@ class AppState {
 		const mm: Record<string, MatAssign> = {};
 		for (const m of mats) {
 			const prev = this.matMap[m];
-			const libId = prev?.libId ?? guessMaterial(m);
+			const libId = prev?.libId ?? hints[m] ?? guessMaterial(m);
 			const lib = LIBRARY.find((l) => l.id === libId)!;
-			mm[m] = { libId, porous: prev?.porous ?? (lib.porous ? { ...lib.porous } : undefined) };
+			// lana de un producto conocido: su densidad y resistividad de ficha
+			const prod = porousProduct(m);
+			const porous = lib.porous ? { ...lib.porous, ...(prod ? { density_kgm3: prod.density_kgm3, flowRes: prod.flowRes } : {}) } : undefined;
+			mm[m] = { libId, porous: prev?.porous ?? porous };
 		}
 		this.matMap = mm;
 		this.result = null;
@@ -239,6 +253,8 @@ class AppState {
 		];
 		return {
 			tris: Float32Array.from(positions), triMat, betaByMat, names,
+			// para mover los objetos en la colocación automática: la sala fija va primero
+			nStatic: this.tris.materials.length, objects: objs, objMat: objs.map((o) => names.indexOf(objectMaterialName(o))),
 			fmax: this.sim.fmax, ppw: this.sim.ppw, durationS: this.sim.durationS,
 			seed: L, sources, receivers, planeY: L[1]
 		};
