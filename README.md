@@ -1,46 +1,38 @@
 # Acustica3D
 
-Herramientas propias para sacar el máximo de un estudio pequeño con **Neumann KH 120 A** y **ADAM Sub8**. Incluye simulación acústica de la sala, colocación de equipos, corrección DSP y medidas.
+Programa para Windows que simula cómo suenan los graves **en tu sala** a partir de su modelo 3D de SketchUp y te dice dónde poner los altavoces, el subwoofer y tu silla.
 
-| Parte | Qué es | Dónde |
-|---|---|---|
-| **Sala3D** | Simulación acústica 3D de la sala a partir del modelo de SketchUp. Mapas, mejor posición de escucha, colocación automática de KH, sub y oyente, y tratamiento. | [`sala3d/`](sala3d/README.md) |
-| **KH120A Corrector** | Plugin VST3/CLAP con los filtros FIR de corrección (fase lineal o baja latencia). | [`plugin/`](plugin/LEEME_PLUGIN.md) |
-| **Modelo y filtros del KH 120 A** | Datos, modelo Thiele-Small, difracción, distorsión, diseño de los FIR y gráficas. | [`LEEME_KH120A_DSP.md`](LEEME_KH120A_DSP.md), `src/`, `filtros/`, `graficas/` |
+- **Mapa de dónde se oye mejor:** en verde lo mejor y en rojo lo peor. Al mover la cabeza ves la curva de graves de ese punto al momento.
+- **Colocación automática:** prueba combinaciones de altavoces, sub y posición de escucha por toda la sala y te propone las mejores.
+- **Paneles y trampas de graves:** los pruebas en la simulación antes de comprarlos.
+- **Mapa animado de la sala** de 20 a 300 Hz, para ver dónde se acumula o desaparece cada frecuencia.
 
-## Descargar Sala3D para Windows
+## Descargar
 
-En **[Releases](../../releases/latest)** descarga `Sala3D_win64.zip`.
-1. Descomprímelo.
-2. Abre `Sala3D.exe`.
+**[Descargar Acustica3D para Windows](https://github.com/NapalmCandy/Acustica3D/releases/latest)**: descomprime `Acustica3D_win64.zip` y abre `Acustica3D.exe`.
+- Se abre en su propia ventana.
+- Se actualiza solo cuando hay una versión nueva.
+- Necesita Windows 10 u 11 con Microsoft Edge o Google Chrome.
 
-A partir de ahí se **actualiza solo**: al abrirse mira si hay una versión nueva aquí, la descarga en segundo plano y la instala al cerrar (o al momento con «Reiniciar ahora»).
+Instrucciones de uso en [acustica3d/README.md](acustica3d/README.md).
 
-## Publicar una versión nueva
+## Cómo funciona
 
-Sube el número de versión de `sala3d/package.json` y súbelo a `main`:
+1. **Modelo de la sala:** el plano 3D de SketchUp, con un material acústico para cada superficie (pladur, ladrillo, cristal, paneles…).
+2. **Simulación:** Acustica3D divide el aire de la sala en millones de celdillas y calcula cómo viaja y rebota la onda de cada altavoz. Todo se hace en tu PC, con el procesador o con la tarjeta gráfica.
+3. **Colocación:** con la respuesta en cada punto, puntúa cada posible sitio de escucha por varios criterios:
+   - grave plano y sin huecos;
+   - poco retumbe;
+   - imagen estéreo simétrica y lejos de las paredes.
 
-```bash
-cd sala3d
-npm version patch --no-git-tag-version   # 0.3.0 → 0.3.1 (minor: 0.4.0)
-git commit -am "Sala3D 0.3.1" && git push
-```
+   Después busca la mejor combinación de altavoces, sub y silla.
+4. **Corrección:** lo que queda, como los picos de grave o la fase del cruce, se corrige con el plugin. Los huecos no se arreglan con ecualización: se evitan colocando bien.
+5. **Medida** (próximamente): con un micrófono de medida se calibra todo para tu sala real.
 
-GitHub Actions ([`release.yml`](.github/workflows/release.yml)) hace el resto:
-1. Pasa las pruebas.
-2. Compila la app web y `Sala3D.exe` con esa versión.
-3. Publica la release `v0.3.1` con el `.zip` y el `.pack`, el paquete que usa el actualizador.
+## También en este repositorio
 
-Los `Sala3D.exe` ya instalados la detectan solos. También se puede lanzar a mano desde **Actions → Publicar versión de Sala3D → Run workflow**; si esa versión ya está publicada, no hace nada.
-
-En cada cambio en `sala3d/` se pasan además las comprobaciones de [`pruebas.yml`](.github/workflows/pruebas.yml): tipos, 17 pruebas de física y compilación.
-
-## Clonar
-
-El plugin usa DPF y PFFFT como submódulos:
-
-```bash
-git clone --recursive https://github.com/NapalmCandy/Acustica3D.git
-```
-
-`CLAUDE.md` resume el contexto del proyecto (equipo, sala, decisiones y pendientes) para seguir trabajando con Claude Code.
+- **KH120A Corrector:** plugin VST3/CLAP para el máster del DAW que corrige la respuesta y la fase de los Neumann KH 120 A.
+  - Lleva filtros FIR en fase lineal o en baja latencia, y protege el woofer de los subgraves.
+  - Los filtros actuales son provisionales: salen de un modelo del altavoz, a la espera de medidas reales.
+  - Ver [plugin/LEEME_PLUGIN.md](plugin/LEEME_PLUGIN.md).
+- **Modelo del KH 120 A:** datos, simulación del altavoz, distorsión y diseño de los filtros, en [LEEME_KH120A_DSP.md](LEEME_KH120A_DSP.md).

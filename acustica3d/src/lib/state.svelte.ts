@@ -175,7 +175,7 @@ class AppState {
 	/** Proyecto: todo menos la geometría (el modelo se vuelve a cargar desde SketchUp). */
 	exportProject() {
 		return {
-			app: 'Sala3D', version: 1, modelName: this.modelName,
+			app: 'Acustica3D', version: 1, modelName: this.modelName,
 			matMap: $state.snapshot(this.matMap), positions: $state.snapshot(this.positions),
 			kh: $state.snapshot(this.kh), sub: $state.snapshot(this.sub), sim: $state.snapshot(this.sim),
 			objects: $state.snapshot(this.objects) as RoomObject[] | undefined,
@@ -186,7 +186,7 @@ class AppState {
 	}
 
 	importProject(p: ReturnType<AppState['exportProject']>) {
-		if (p?.app !== 'Sala3D') throw new Error('No es un proyecto de Sala3D.');
+		if (p?.app !== 'Acustica3D' && p?.app !== 'Sala3D') throw new Error('No es un proyecto de Acustica3D.'); // Sala3D: nombre antiguo
 		for (const [k, v] of Object.entries(p.matMap ?? {})) if (this.matMap[k] || !this.materialNames.length) this.matMap[k] = v;
 		this.positions = p.positions;
 		this.kh = p.kh;

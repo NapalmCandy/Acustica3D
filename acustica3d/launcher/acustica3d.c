@@ -1,17 +1,20 @@
 /*
- * Sala3D.exe — abre Sala3D como una aplicación de ventana propia en Windows.
+ * Acustica3D.exe — abre Acustica3D como una aplicación de ventana propia en Windows.
  *
  * 1. Sirve la carpeta "web" (junto al .exe) en http://localhost:8765 (o el siguiente puerto libre),
  *    solo en 127.0.0.1: no es accesible desde otros equipos.
  * 2. Abre la app en una ventana de Microsoft Edge en modo aplicación (sin pestañas ni barra de
- *    direcciones), con un perfil propio en %LOCALAPPDATA%\Sala3D. Si no hay Edge, usa Chrome; si
+ *    direcciones), con un perfil propio en %LOCALAPPDATA%\Acustica3D. Si no hay Edge, usa Chrome; si
  *    tampoco, el navegador predeterminado.
- * 3. Al cerrar esa ventana, Sala3D termina.
+ * 3. Al cerrar esa ventana, Acustica3D termina.
  *
  * 4. Actualización automática: al arrancar (y cada 6 horas) consulta la última versión publicada en
  *    GitHub (NapalmCandy/Acustica3D). Si es más nueva, la descarga en segundo plano a la carpeta
- *    "actualizacion" y la instala al cerrar Sala3D (o al momento con «Reiniciar ahora» en la app).
+ *    "actualizacion" y la instala al cerrar Acustica3D (o al momento con «Reiniciar ahora» en la app).
  *    La app pregunta el estado en GET /api/update y pide reiniciar con POST /api/update/restart.
+ *
+ * 5. El programa se llamó antes Sala3D.exe: si se arranca con ese nombre, se copia como Acustica3D.exe,
+ *    abre esa copia y se cierra; la copia borra el Sala3D.exe antiguo.
  *
  * Opción --no-browser: solo servidor, sin ventana (para pruebas).
  * Variable SALA3D_UPDATE_URL: otra dirección para la consulta de versiones (para pruebas).
@@ -34,7 +37,7 @@
 #define APP_VERSION "0.0.0-dev"
 #endif
 #define UPDATE_URL L"https://api.github.com/repos/NapalmCandy/Acustica3D/releases/latest"
-#define PACK_NAME "Sala3D_win64.pack"
+#define PACK_NAME "Acustica3D_win64.pack"
 
 static wchar_t g_root[MAX_PATH];   /* ...\web */
 static wchar_t g_appdir[MAX_PATH]; /* carpeta del .exe */
@@ -62,7 +65,7 @@ static void set_state(const char *st, const char *msg)
 
 static void fail(const wchar_t *msg)
 {
-    MessageBoxW(NULL, msg, L"Sala3D", MB_OK | MB_ICONERROR);
+    MessageBoxW(NULL, msg, L"Acustica3D", MB_OK | MB_ICONERROR);
     ExitProcess(1);
 }
 
@@ -146,7 +149,7 @@ static void handle_api(SOCKET s, const char *method, const char *url, const char
         if (!ready) { send_status(s, "409 Conflict"); return; }
         send_json(s, "{\"ok\":true}");
         InterlockedExchange(&g_restart, 1);
-        /* cerrar la ventana: el hilo principal instala la actualización y vuelve a abrir Sala3D */
+        /* cerrar la ventana: el hilo principal instala la actualización y vuelve a abrir Acustica3D */
         if (g_browser) TerminateProcess(g_browser, 0);
         return;
     }
@@ -246,8 +249,8 @@ static int http_get(const wchar_t *url, char **out, size_t *out_len, HANDLE file
     uc.lpszUrlPath = path;
     uc.dwUrlPathLength = 2048;
     if (!WinHttpCrackUrl(url, 0, 0, &uc)) return -1;
-    HINTERNET ses = WinHttpOpen(L"Sala3D-actualizador", 4 /* WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY */, NULL, NULL, 0);
-    if (!ses) ses = WinHttpOpen(L"Sala3D-actualizador", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, NULL, NULL, 0);
+    HINTERNET ses = WinHttpOpen(L"Acustica3D-actualizador", 4 /* WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY */, NULL, NULL, 0);
+    if (!ses) ses = WinHttpOpen(L"Acustica3D-actualizador", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, NULL, NULL, 0);
     if (!ses) return -2;
     WinHttpSetTimeouts(ses, 10000, 10000, 15000, 30000);
     int rc = -3;
@@ -435,7 +438,7 @@ static int check_update(void)
     _snwprintf(pack, MAX_PATH, L"%ls\\paquete.pack", stage);
     MultiByteToWideChar(CP_UTF8, 0, dl, -1, wdl, 1024);
     HANDLE f = CreateFileW(pack, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (f == INVALID_HANDLE_VALUE) { set_state("error", "No puedo escribir en la carpeta de Sala3D"); return 0; }
+    if (f == INVALID_HANDLE_VALUE) { set_state("error", "No puedo escribir en la carpeta de Acustica3D"); return 0; }
     rc = http_get(wdl, NULL, NULL, f);
     CloseHandle(f);
     if (rc) { set_state("error", "Descarga incompleta"); delete_tree(stage); return 0; }
@@ -443,11 +446,11 @@ static int check_update(void)
     _snwprintf(files, MAX_PATH, L"%ls\\nuevo", stage);
     if (extract_pack(pack, files)) { set_state("error", "Paquete dañado"); delete_tree(stage); return 0; }
     wchar_t probe1[MAX_PATH], probe2[MAX_PATH];
-    _snwprintf(probe1, MAX_PATH, L"%ls\\Sala3D.exe", files);
+    _snwprintf(probe1, MAX_PATH, L"%ls\\Acustica3D.exe", files);
     _snwprintf(probe2, MAX_PATH, L"%ls\\web\\index.html", files);
     if (!file_exists(probe1) || !file_exists(probe2)) { set_state("error", "Paquete incompleto"); delete_tree(stage); return 0; }
     DeleteFileW(pack);
-    set_state("ready", "Se instalará al cerrar Sala3D");
+    set_state("ready", "Se instalará al cerrar Acustica3D");
     return 1;
 }
 
@@ -461,7 +464,7 @@ static DWORD WINAPI update_thread(LPVOID unused)
 }
 
 /* Sustituye el .exe y la carpeta web por los de "actualizacion\nuevo". El .exe en marcha no se puede
- * borrar, pero sí renombrar: queda como Sala3D.exe.old y se borra en el siguiente arranque. */
+ * borrar, pero sí renombrar: queda como Acustica3D.exe.old y se borra en el siguiente arranque. */
 static int apply_update(void)
 {
     wchar_t stage[MAX_PATH], nuevo[MAX_PATH], from[MAX_PATH * 2], to[MAX_PATH * 2], old[MAX_PATH * 2];
@@ -495,12 +498,17 @@ static int apply_update(void)
     return ok;
 }
 
-/* Restos de una actualización anterior. */
+/* Restos de una actualización anterior (y del nombre antiguo, Sala3D.exe). */
 static void cleanup_old(void)
 {
     wchar_t p[MAX_PATH * 2];
     _snwprintf(p, MAX_PATH * 2, L"%ls.old", g_exe);
     DeleteFileW(p);
+    _snwprintf(p, MAX_PATH * 2, L"%ls\\Sala3D.exe.old", g_appdir);
+    DeleteFileW(p);
+    _snwprintf(p, MAX_PATH * 2, L"%ls\\Sala3D.exe", g_appdir);
+    if (_wcsicmp(p, g_exe)) /* el antiguo puede estar terminando de cerrarse: se reintenta un poco */
+        for (int i = 0; i < 15 && GetFileAttributesW(p) != INVALID_FILE_ATTRIBUTES && !DeleteFileW(p); ++i) Sleep(200);
     _snwprintf(p, MAX_PATH * 2, L"%ls\\web.old", g_appdir);
     delete_tree(p);
 }
@@ -542,12 +550,30 @@ int main(int argc, char **argv)
     wchar_t *slash = wcsrchr(g_appdir, L'\\');
     if (slash) *slash = 0;
     _snwprintf(g_root, MAX_PATH, L"%ls\\web", g_appdir);
+
+    /* nombre antiguo: pasar a Acustica3D.exe */
+    const wchar_t *base = wcsrchr(g_exe, L'\\');
+    base = base ? base + 1 : g_exe;
+    if (!_wcsicmp(base, L"Sala3D.exe")) {
+        wchar_t nuevo[MAX_PATH], cmd[MAX_PATH + 32];
+        _snwprintf(nuevo, MAX_PATH, L"%ls\\Acustica3D.exe", g_appdir);
+        _snwprintf(cmd, MAX_PATH + 32, L"\"%ls\"%ls", nuevo, no_browser ? L" --no-browser" : L"");
+        STARTUPINFOW si;
+        PROCESS_INFORMATION pi;
+        memset(&si, 0, sizeof si);
+        si.cb = sizeof si;
+        if (CopyFileW(g_exe, nuevo, FALSE) && CreateProcessW(NULL, cmd, NULL, NULL, FALSE, 0, NULL, g_appdir, &si, &pi)) {
+            CloseHandle(pi.hProcess);
+            CloseHandle(pi.hThread);
+            return 0;
+        }
+    }
     cleanup_old();
     wchar_t probe[MAX_PATH * 2];
     _snwprintf(probe, MAX_PATH * 2, L"%ls\\index.html", g_root);
     if (!file_exists(probe))
-        fail(L"No encuentro la carpeta \"web\" junto a Sala3D.exe.\n\n"
-             L"Descomprime el zip completo y abre Sala3D.exe desde esa carpeta.");
+        fail(L"No encuentro la carpeta \"web\" junto a Acustica3D.exe.\n\n"
+             L"Descomprime el zip completo y abre Acustica3D.exe desde esa carpeta.");
 
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);
@@ -592,7 +618,7 @@ int main(int argc, char **argv)
     if (found) {
         // perfil propio: ventana independiente de tu navegador y se puede esperar a que se cierre
         wchar_t profile[MAX_PATH];
-        ExpandEnvironmentStringsW(L"%LOCALAPPDATA%\\Sala3D\\perfil_ventana", profile, MAX_PATH);
+        ExpandEnvironmentStringsW(L"%LOCALAPPDATA%\\Acustica3D\\perfil_ventana", profile, MAX_PATH);
         SHCreateDirectoryExW(NULL, profile, NULL);
         wchar_t cmd[2048];
         _snwprintf(cmd, 2048,
@@ -612,15 +638,15 @@ int main(int argc, char **argv)
             CloseHandle(pi.hThread);
             if (GetTickCount() - t0 > 4000 || g_restart) return finish(0); // ventana cerrada: fin
             // el proceso pasó la ventana a otra instancia: no podemos saber cuándo se cierra
-            MessageBoxW(NULL, L"Sala3D está abierta.\n\nPulsa Aceptar cuando quieras cerrarla.", L"Sala3D",
+            MessageBoxW(NULL, L"Acustica3D está abierta.\n\nPulsa Aceptar cuando quieras cerrarla.", L"Acustica3D",
                         MB_OK | MB_ICONINFORMATION);
             return finish(0);
         }
     }
     ShellExecuteW(NULL, L"open", url, NULL, NULL, SW_SHOWNORMAL);
     MessageBoxW(NULL,
-                L"Sala3D se ha abierto en tu navegador (no he encontrado Edge ni Chrome para abrirla en su propia "
+                L"Acustica3D se ha abierto en tu navegador (no he encontrado Edge ni Chrome para abrirla en su propia "
                 L"ventana).\n\nPulsa Aceptar cuando quieras cerrarla.",
-                L"Sala3D", MB_OK | MB_ICONINFORMATION);
+                L"Acustica3D", MB_OK | MB_ICONINFORMATION);
     return finish(0);
 }

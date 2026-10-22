@@ -13,7 +13,7 @@ let ok = true;
 const check = (name, cond, info = '') => { ok &&= !!cond; console.log((cond ? 'OK   ' : 'FALLO'), name, info); };
 
 await page.goto(APP_URL);
-await page.waitForSelector('h1:has-text("Sala3D")');
+await page.waitForSelector('h1:has-text("Acustica3D")');
 await page.setInputFiles('#model-file', new URL('./sala_prueba_sketchup.dae', import.meta.url).pathname);
 await page.waitForSelector('aside li span[title="Panel_LR_50mm"]', { timeout: 15000 });
 const dims = await page.locator('dd').nth(1).innerText();

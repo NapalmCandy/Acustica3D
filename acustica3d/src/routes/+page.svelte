@@ -6,13 +6,16 @@
 	import { runSimulation } from '../lib/sim/controller';
 	import { onMount } from 'svelte';
 
-	// Actualizaciones: solo existen cuando la app la sirve Sala3D.exe (en el navegador o el visor no hay /api)
+	// Actualizaciones: solo existen cuando la app la sirve Acustica3D.exe (en el navegador o el visor no hay /api)
 	type Upd = { current: string; state: string; latest: string; done: number; total: number; message: string };
 	let upd = $state<Upd | null>(null);
 	let restarting = $state(false);
 	onMount(() => {
 		let timer: ReturnType<typeof setTimeout>;
 		let stop = false;
+		// el lanzador sirve la app en 127.0.0.1 / localhost, puertos 8765–8784; en cualquier otro sitio no hay /api
+		const port = Number(location.port);
+		if (!['localhost', '127.0.0.1'].includes(location.hostname) || port < 8765 || port > 8784) return;
 		const poll = async () => {
 			try {
 				const r = await fetch('/api/update', { cache: 'no-store' });
@@ -90,7 +93,7 @@
 		const blob = new Blob([JSON.stringify(app.exportProject(), null, 1)], { type: 'application/json' });
 		const a = document.createElement('a');
 		a.href = URL.createObjectURL(blob);
-		a.download = (app.modelName?.replace(/\.[^.]+$/, '') ?? 'sala') + '.sala3d.json';
+		a.download = (app.modelName?.replace(/\.[^.]+$/, '') ?? 'sala') + '.acustica3d.json';
 		a.click();
 		URL.revokeObjectURL(a.href);
 	}
@@ -107,11 +110,11 @@
 	}
 </script>
 
-<svelte:head><title>Sala3D</title></svelte:head>
+<svelte:head><title>Acustica3D</title></svelte:head>
 
 <div class="app-root grid h-full grid-rows-[auto_1fr] bg-bg">
 	<header class="gutter flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-panel py-2">
-		<h1 class="text-base font-semibold text-ink">Sala3D</h1>
+		<h1 class="text-base font-semibold text-ink">Acustica3D</h1>
 		<span class="text-xs text-muted">Simulación acústica 3D de la sala · fase 1: graves</span>
 		<span class="text-[11px] tabular-nums text-muted" id="app-version">v{upd?.current ?? __APP_VERSION__}</span>
 		{#if upd?.state === 'downloading'}

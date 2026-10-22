@@ -1,26 +1,26 @@
-# Comprobaciones de Sala3D en cada cambio: tipos, pruebas de física y compilación.
-name: Pruebas de Sala3D
+# Comprobaciones de Acustica3D en cada cambio: tipos, pruebas de física y compilación.
+name: Pruebas de Acustica3D
 
 on:
   push:
     branches: [main]
-    paths: ['sala3d/**', '.github/workflows/pruebas.yml']
+    paths: ['acustica3d/**', '.github/workflows/pruebas.yml']
   pull_request:
-    paths: ['sala3d/**']
+    paths: ['acustica3d/**']
 
 jobs:
   pruebas:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: sala3d
+        working-directory: acustica3d
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: sala3d/package-lock.json
+          cache-dependency-path: acustica3d/package-lock.json
       - run: npm ci
       - run: npx svelte-kit sync && npx svelte-check --threshold error
       - run: npx vitest run

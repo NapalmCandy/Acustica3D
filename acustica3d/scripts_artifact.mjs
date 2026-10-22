@@ -8,7 +8,7 @@ const keep = head
 	.map((l) => l.trim())
 	.filter((l) => l.startsWith('<link') || l.startsWith('<meta name="description"'))
 	.join('\n');
-const frag = `<title>Sala3D</title>\n${keep}\n${body.trim()}\n`;
+const frag = `<title>Acustica3D</title>\n${keep}\n${body.trim()}\n`;
 rmSync('artifact', { recursive: true, force: true });
 mkdirSync('artifact', { recursive: true });
 writeFileSync('artifact/index.html', frag);

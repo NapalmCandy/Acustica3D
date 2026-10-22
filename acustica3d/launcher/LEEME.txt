@@ -4,23 +4,23 @@ SALA3D v{{VERSION}} — CÓMO ABRIRLO
 1. Descomprime el zip entero: clic derecho sobre el zip > "Extraer todo".
    (No lo abras desde dentro del zip: no funcionaría.)
 
-2. Entra en la carpeta "Sala3D" y haz doble clic en Sala3D.exe.
+2. Entra en la carpeta "Acustica3D" y haz doble clic en Acustica3D.exe.
 
-3. Sala3D se abre en su propia ventana, sin pestañas ni barra de direcciones.
+3. Acustica3D se abre en su propia ventana, sin pestañas ni barra de direcciones.
    Por dentro usa Microsoft Edge en modo aplicación (viene con Windows 10/11);
    si no hay Edge, usa Chrome.
 
-4. Para salir, cierra la ventana de Sala3D. El programa se cierra solo.
+4. Para salir, cierra la ventana de Acustica3D. El programa se cierra solo.
 
 
 ACTUALIZACIONES AUTOMÁTICAS
 ---------------------------
-Al abrirse, Sala3D mira si hay una versión nueva en GitHub
+Al abrirse, Acustica3D mira si hay una versión nueva en GitHub
 (github.com/NapalmCandy/Acustica3D). Si la hay, la descarga mientras trabajas
 y se instala sola al cerrar la ventana; la próxima vez ya abre la nueva.
 En la cabecera de la app verás el aviso y un botón "Reiniciar ahora" por si
 la quieres ya. Tus proyectos guardados no se tocan.
-Para que pueda actualizarse, la carpeta de Sala3D tiene que poder escribirse
+Para que pueda actualizarse, la carpeta de Acustica3D tiene que poder escribirse
 (por ejemplo en Documentos o en el Escritorio; no en "Archivos de programa").
 
 
@@ -28,7 +28,7 @@ LA PRIMERA VEZ
 --------------
 - Windows puede mostrar "Windows protegió su PC" porque el programa no está
   firmado. Pulsa "Más información" > "Ejecutar de todas formas".
-- Sala3D solo funciona dentro de tu PC (dirección 127.0.0.1): no abre nada a
+- Acustica3D solo funciona dentro de tu PC (dirección 127.0.0.1): no abre nada a
   tu red. Solo sale a internet para buscar actualizaciones en GitHub.
   Si el firewall preguntara por conexiones entrantes, puedes denegarlas y
   funcionará igual.
@@ -36,10 +36,10 @@ LA PRIMERA VEZ
 
 IMPORTANTE
 ----------
-- No saques Sala3D.exe de su carpeta: necesita la carpeta "web" que está a su lado.
-  Si quieres un acceso directo en el escritorio: clic derecho sobre Sala3D.exe >
+- No saques Acustica3D.exe de su carpeta: necesita la carpeta "web" que está a su lado.
+  Si quieres un acceso directo en el escritorio: clic derecho sobre Acustica3D.exe >
   "Enviar a" > "Escritorio (crear acceso directo)".
-- Los ajustes de la ventana se guardan en %LOCALAPPDATA%\Sala3D.
+- Los ajustes de la ventana se guardan en %LOCALAPPDATA%\Acustica3D.
 - Atajos útiles en la ventana: Ctrl + R recarga, Ctrl + rueda del ratón cambia el zoom.
 
 
