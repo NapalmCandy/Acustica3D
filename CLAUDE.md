@@ -27,7 +27,7 @@ Idioma de trabajo: **español**. El usuario produce hardcore/gabber, escucha alt
 
 ## Acustica3D: puntos clave
 - **Desarrollo:**
-  - `npm install` (`.npmrc` con legacy-peer-deps), `npm run dev`, `npx vitest run` (46 pruebas), `npm run build`.
+  - `npm install` (`.npmrc` con legacy-peer-deps), `npm run dev`, `npx vitest run` (47 pruebas), `npm run build`.
   - Prueba completa: `node testdata/e2e.mjs http://localhost:4173/ cpu|gpu`, con `vite preview` en marcha. Reinicia preview tras cada build.
   - No uses `pkill -f` con un patrón que aparezca en la misma orden.
 - **Simulación:**
@@ -45,7 +45,7 @@ Idioma de trabajo: **español**. El usuario produce hardcore/gabber, escucha alt
   - Después ajusta el Sub8 (corte, nivel, fase, filtro de 85 Hz) y los interruptores Bass/Low-Mid de los KH en las 40 mejores colocaciones, probando todas las combinaciones (`tuneSettings`).
 - **Interruptores del KH 120 A:** `KH_EQ` en `acoustics/speakers.ts`, ajustados a la gráfica del manual de Neumann (pág. 25): Bass, estante de 183 Hz y Q 0,62; Low-Mid, campana de 260 Hz y Q 0,36; Treble, estante de 5,4 kHz y Q 0,84.
 - **Mapa de la sala:** de 20 a 300 Hz, con animación precalculada (`mapAnim.svelte.ts`, `doFrames`).
-- **Medios y agudos** (pestaña `agudos`, `hf/imageSource.ts` en `hf/hf.worker.ts`): método de la imagen hasta orden 1–4 con oclusión, directividad estimada del KH, aire y absorción por octavas + cola difusa (Eyring). Reflectograma y zona libre de reflexiones. Pendiente: datos polares reales del KH, difusión, dos oídos (HRTF), unir con los graves (cruce ~300–500 Hz).
+- **Medios y agudos** (pestaña `agudos`, `hf/imageSource.ts` en `hf/hf.worker.ts`): método de la imagen hasta orden 1–4 con oclusión, directividad del KH 120 medida por Neumann (`hf/kh120Directivity.ts`, leída del manual con `scripts/kh120_directividad.py`; detrás de ±90° estimada), aire y absorción por octavas + cola difusa (Eyring, Q integrado). Reflectograma y zona libre de reflexiones. Pendiente: difusión, dos oídos (HRTF), unir con los graves (cruce ~300–500 Hz).
 - **Lanzador:** Edge con `--force_high_performance_gpu` (el usuario tiene una RTX 3080 y Edge cogía la integrada).
 - **Artifact web** (privado): https://claude.ai/artifact/V2mNhwfGzLEqnW9TUmchmo.
   - Se genera con `node scripts_artifact.mjs`; usa `appDir: 'app'` porque el servicio no admite rutas con `_`.

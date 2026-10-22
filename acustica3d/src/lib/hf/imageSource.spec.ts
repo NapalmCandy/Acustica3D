@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findPaths, pathAmplitude, directivityDb } from './imageSource';
+import { findPaths, pathAmplitude, khDirectivityDb, KH_Q } from './imageSource';
 import { shoebox, addBox } from '../sim/testgeo';
 import type { V3 } from '../sim/voxel';
 
@@ -43,7 +43,27 @@ describe('medios y agudos (método de la imagen)', () => {
 		expect(pathAmplitude(direct, 1000, aim, rigid)).toBeCloseTo(1 / direct.length, 2);
 		const r = refl[0];
 		expect(pathAmplitude(r, 1000, aim, soft) / pathAmplitude(r, 1000, aim, rigid)).toBeCloseTo(Math.sqrt(0.5), 3);
-		expect(directivityDb(90, 8000)).toBeLessThan(directivityDb(90, 500) - 8);
-		expect(directivityDb(0, 16000)).toBe(0);
+	});
+
+	it('directividad del KH 120 con los diagramas de Neumann', () => {
+		const aim: V3 = [0, 0, -1]; // mirando hacia −Z, de pie
+		const at = (h: number, v: number): V3 => {
+			const a = (h * Math.PI) / 180, e = (v * Math.PI) / 180;
+			return [Math.sin(a) * Math.cos(e), Math.sin(e), -Math.cos(a) * Math.cos(e)];
+		};
+		expect(khDirectivityDb(aim, aim, 16000)).toBeCloseTo(0, 6);
+		// en el eje horizontal se estrecha con la frecuencia: a 60°, unos −3 dB a 500 Hz y unos −10 dB a 8 kHz
+		expect(khDirectivityDb(at(60, 0), aim, 500)).toBeGreaterThan(-4);
+		expect(khDirectivityDb(at(60, 0), aim, 8000)).toBeLessThan(-9);
+		// simétrico a izquierda y derecha
+		expect(khDirectivityDb(at(-45, 0), aim, 4000)).toBeCloseTo(khDirectivityDb(at(45, 0), aim, 4000), 6);
+		// el nulo vertical del cruce: a 2 kHz y 45° hacia arriba cae mucho más que en horizontal
+		expect(khDirectivityDb(at(0, 45), aim, 2000)).toBeLessThan(khDirectivityDb(at(45, 0), aim, 2000) - 8);
+		// detrás, menos que delante
+		expect(khDirectivityDb(at(180, 0), aim, 1000)).toBeLessThan(khDirectivityDb(at(90, 0), aim, 1000));
+		// Q crece con la frecuencia (casi omni en graves, más directivo en agudos)
+		expect(KH_Q[1]).toBeLessThan(2);
+		expect(KH_Q[7]).toBeGreaterThan(KH_Q[4]);
+		expect(KH_Q[7]).toBeGreaterThan(4);
 	});
 });

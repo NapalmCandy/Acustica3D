@@ -8,6 +8,7 @@
 // punto de rebote cae dentro de una superficie real y que nada tapa el camino. El resto de la energía
 // (la cola difusa) se suma aparte, de forma estadística.
 import type { V3 } from '../sim/voxel';
+import { KH120_DIR_FREQS, KH120_DIR_H, KH120_DIR_UP, KH120_DIR_DOWN } from './kh120Directivity';
 
 export interface Plane {
 	n: V3; // normal unitaria
@@ -228,24 +229,52 @@ export function findPaths(tris: Float32Array, triMat: Int32Array, sources: { id:
 
 export const HF_OCTAVES = [63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
-/** Directividad estimada del KH 120 A (dB respecto al eje), por ángulo y octava. Guía de onda y woofer
- *  de 5¼": muy ancha en graves, se estrecha por encima de 2 kHz. [estimado: a falta de los datos
- *  polares de Neumann] */
-const DIR_ANGLES = [0, 15, 30, 45, 60, 90, 120, 150, 180];
-const DIR_DB = [
-	// 63  125   250   500   1k    2k    4k    8k    16k
-	[0, 0, 0, 0, 0, 0, 0, 0, 0],
-	[0, 0, 0, 0, 0, 0, -0.5, -1, -1.5],
-	[0, 0, 0, 0, -0.5, -1, -1.5, -2.5, -4],
-	[0, 0, 0, -0.5, -1, -2, -3, -5, -8],
-	[0, 0, -0.5, -1, -2, -4, -5, -8, -12],
-	[0, -0.5, -1, -3, -5, -8, -10, -14, -18],
-	[-0.5, -1, -3, -6, -9, -12, -15, -18, -22],
-	[-1, -2, -5, -9, -13, -16, -19, -22, -25],
-	[-1.5, -3, -6, -11, -15, -18, -20, -23, -26]
-];
-/** factor de directividad Q del KH 120 A por octava (para el campo difuso) [estimado] */
-export const KH_Q = [1.2, 1.5, 2, 3, 4, 6, 8, 10, 12];
+/** Lo que baja además detrás del altavoz (de 90° a 180°), por octava: el manual solo llega a ±90°.
+ *  [estimado: caja de 18 × 28 cm, casi omnidireccional en graves] */
+const REAR_DB = [-1, -2.5, -5, -8, -10, -10, -10, -9, -8];
+
+/** Nivel (dB) de una tabla de directividad del manual a un ángulo (0–90°) y una frecuencia. */
+function dirTable(T: number[][], ang: number, f: number): number {
+	const F = KH120_DIR_FREQS;
+	const x = Math.log(Math.max(F[0], Math.min(F[F.length - 1], f)) / F[0]) / Math.log(2 ** (1 / 3));
+	const i = Math.min(F.length - 2, Math.floor(x)), tf = Math.min(1, x - i);
+	const a = Math.min(90, Math.max(0, ang)) / 10;
+	const j = Math.min(8, Math.floor(a)), ta = a - j;
+	const at = (r: number) => T[r][j] * (1 - ta) + T[r][j + 1] * ta;
+	return at(i) * (1 - tf) + at(i + 1) * tf;
+}
+
+/** Directividad del KH 120 (dB respecto a su eje) en la dirección `dir` para un altavoz que apunta a
+ *  `aim` y está de pie (tweeter arriba): ángulo horizontal y vertical respecto al eje, con las tablas
+ *  medidas por Neumann (sumadas en dB: aproximación separable) y, detrás, una caída estimada. */
+export function khDirectivityDb(dir: V3, aim: V3, f: number): number {
+	const fwd = unit(aim);
+	// «arriba» del altavoz: la vertical, sin la parte que va a lo largo del eje
+	const k = fwd[1];
+	const up = unit([-k * fwd[0], 1 - k * fwd[1], -k * fwd[2]]);
+	const right: V3 = [fwd[1] * up[2] - fwd[2] * up[1], fwd[2] * up[0] - fwd[0] * up[2], fwd[0] * up[1] - fwd[1] * up[0]];
+	const d = unit(dir);
+	const xf = dot(d, fwd), xr = dot(d, right), xu = dot(d, up);
+	const h = (Math.abs(Math.atan2(xr, xf)) * 180) / Math.PI; // 0–180
+	const v = (Math.atan2(xu, Math.hypot(xf, xr)) * 180) / Math.PI; // −90 (abajo) … 90 (arriba)
+	let db = dirTable(KH120_DIR_H, Math.min(90, h), f) + dirTable(v >= 0 ? KH120_DIR_UP : KH120_DIR_DOWN, Math.abs(v), f);
+	if (h > 90) db += (octInterp(REAR_DB, f) * (h - 90)) / 90;
+	return db;
+}
+
+/** Factor de directividad Q del KH 120 por octava (63 Hz – 16 kHz): 4π entre la integral de la
+ *  potencia relativa al eje sobre toda la esfera. Para el campo difuso. */
+export const KH_Q = HF_OCTAVES.map((f) => {
+	let acc = 0;
+	const N = 36, M = 18;
+	for (let i = 0; i < N; i++)
+		for (let j = 0; j < M; j++) {
+			const az = ((i + 0.5) / N) * 2 * Math.PI - Math.PI, el = ((j + 0.5) / M) * Math.PI - Math.PI / 2;
+			const dir: V3 = [Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)];
+			acc += 10 ** (khDirectivityDb(dir, [0, 0, 1], f) / 10) * Math.cos(el) * ((2 * Math.PI) / N) * (Math.PI / M);
+		}
+	return (4 * Math.PI) / acc;
+});
 /** absorción del aire (dB/m, 20 °C, 50 % HR) por octava */
 const AIR_DB_M = [0, 0.0003, 0.001, 0.002, 0.005, 0.01, 0.03, 0.09, 0.3];
 
@@ -258,19 +287,11 @@ export function octInterp(vals: number[], f: number): number {
 	return vals[i] * (1 - t) + vals[i + 1] * t;
 }
 
-export function directivityDb(angleDeg: number, f: number): number {
-	const a = Math.min(180, Math.max(0, angleDeg));
-	let i = 0;
-	while (i < DIR_ANGLES.length - 2 && DIR_ANGLES[i + 1] < a) i++;
-	const t = (a - DIR_ANGLES[i]) / (DIR_ANGLES[i + 1] - DIR_ANGLES[i]);
-	return octInterp(DIR_DB[i], f) * (1 - t) + octInterp(DIR_DB[i + 1], f) * t;
-}
-
 /** Amplitud (respecto al directo de un KH a 1 m en su eje) de un camino a la frecuencia f.
- *  `alpha(mat)`: absorción del material por octavas (9 valores, 63 Hz – 16 kHz); `aim`: eje del KH. */
+ *  `alpha(mat)`: absorción del material por octavas (9 valores, 63 Hz – 16 kHz); `aim`: eje del KH
+ *  (apunta al oído, de pie). */
 export function pathAmplitude(p: Path, f: number, aim: V3, alpha: (mat: number) => number[]): number {
-	const ang = (Math.acos(Math.max(-1, Math.min(1, dot(p.leave, aim)))) * 180) / Math.PI;
-	let a = Math.pow(10, (directivityDb(ang, f) - octInterp(AIR_DB_M, f) * p.length) / 20) / Math.max(0.05, p.length);
+	let a = Math.pow(10, (khDirectivityDb(p.leave, aim, f) - octInterp(AIR_DB_M, f) * p.length) / 20) / Math.max(0.05, p.length);
 	for (const m of p.mats) a *= Math.sqrt(Math.max(0, 1 - octInterp(alpha(m), f)));
 	return a;
 }

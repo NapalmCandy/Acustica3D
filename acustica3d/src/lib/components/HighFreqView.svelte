@@ -267,7 +267,7 @@
 				<li>Por encima de unos cientos de Hz el sonido se comporta como rayos: cada reflexión es una fuente «imagen» detrás de la superficie. Se buscan todas las que llegan a tu oído hasta el orden elegido, comprobando que el rebote cae en una superficie real y que nada tapa el camino (la mesa, la pantalla, las trampas…).</li>
 				<li>Cada rebote pierde lo que absorbe su material en esa octava; la directividad de los KH 120 A (apuntando a tu oído) y el aire atenúan los agudos. Después se suma la cola difusa de la sala (Eyring).</li>
 				<li>Desmarca «cuenta» en un material (la mesa) y se recalcula al momento: así ves cuánto cambia.</li>
-				<li>Estimaciones: directividad del KH a falta de los datos polares de Neumann, superficies como espejos (sin difusión) y un solo punto de escucha (sin la forma de la cabeza). Por debajo de ~300 Hz manda la simulación de graves.</li>
+				<li>La directividad del KH 120 es la medida por Neumann (diagramas horizontal y vertical del manual); detrás del altavoz, estimada. Las superficies son espejos (sin difusión) y hay un solo punto de escucha (sin la forma de la cabeza). Por debajo de ~300 Hz manda la simulación de graves.</li>
 			</ul>
 		</div>
 	</div>

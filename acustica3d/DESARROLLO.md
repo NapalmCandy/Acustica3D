@@ -79,6 +79,9 @@ Prueba de extremo a extremo en Chromium: `node testdata/e2e.mjs URL gpu|cpu`. Co
 
 ## Historial de cambios
 
+### v0.8.1
+- Directividad del KH 120 **medida por Neumann** (diagramas de isobaras horizontal y vertical del manual, pág. III) en vez de estimada: `hf/kh120Directivity.ts`, generado con `scripts/kh120_directividad.py` desde la página rasterizada a 400 ppp. Horizontal (media de los dos lados) + vertical hacia arriba y hacia abajo (los nulos del cruce a ±50° hacia 2 kHz), sumadas en dB; detrás de ±90°, caída estimada. El Q del campo difuso sale de integrar esa directividad sobre la esfera.
+
 ### v0.8
 - **Medios y agudos (100 Hz – 20 kHz)**, pestaña nueva (`hf/imageSource.ts`, `hf/hf.worker.ts`, `HighFreqView.svelte`): método de la imagen sobre la geometría real (planos agrupados, punto de rebote dentro de la superficie, oclusión con rejilla uniforme y recorrido Amanatides–Woo), hasta orden 1–4. Cada camino: directividad estimada del KH 120 A (apuntando al oído), absorción del aire y del material de cada rebote por octavas (8 kHz vale para 16 kHz), respuesta eléctrica del KH (con el interruptor Treble). Más la cola difusa (Eyring, Q del KH, desde el final de las reflexiones calculadas). Reflectograma con la zona libre de reflexiones (−20 dB en 20 ms) y tabla de las reflexiones fuertes con sus superficies y puntos de rebote.
 - El mapa del nivel anterior sigue sirviendo mientras se calcula el siguiente: pedir un mapa a mitad de un nivel ya no da «No hay simulación con mapa» como error del cálculo.
