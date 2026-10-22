@@ -67,7 +67,7 @@ export function guessMaterial(name: string): string {
 		[/techo|ceil|plafon|escayola/, 'falso_techo_pladur'],
 		[/pladur|trasdos|yeso|drywall|gypsum|tabique/, 'pladur_trasdosado'],
 		[/ladrill|brick|obra/, 'ladrillo'],
-		[/hormig|concrete|baldosa|azulejo|ceram|tile/, 'hormigon'],
+		[/hormig|concrete|baldosa|azulejo|ceram|porcel|gres|tile/, 'hormigon'],
 		[/suelo|tarima|parquet|floor|madera_suelo|laminad/, 'tarima'],
 		[/alfombra|carpet|moqueta/, 'alfombra'],
 		[/ventan|crista|vidrio|glass|window/, 'cristal'],
