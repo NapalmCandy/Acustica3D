@@ -79,6 +79,10 @@ Prueba de extremo a extremo en Chromium: `node testdata/e2e.mjs URL gpu|cpu`. Co
 
 ## Historial de cambios
 
+### v0.7.4
+- Colocación con «Solo la actual»: si la orientación actual está a menos de 15° de mirar de frente a una pared, se usa de frente (la cabeza dibujada no suele estar justo en el centro de los KH y torcía el triángulo).
+- En equipos rápidos la búsqueda sigue mientras quede tiempo (`timeS` en `PRECISION`: 1/4/15 min), con hasta 3 veces más posiciones; con el tratamiento se comprueban hasta 20 cambios si cada simulación tarda menos de 2 s. El resultado dice cuántas simulaciones se han hecho en total.
+
 ### v0.7.3
 - Las gráficas de respuesta («Mejor posición» y «Respuesta») van del «Desde» al «Hasta» elegidos; lo que pase de la frecuencia simulada sale en gris («sin datos»).
 - El mapa de «Mejor posición» ya no se corta en 250 Hz: llega hasta el 80 % de la frecuencia máxima simulada.

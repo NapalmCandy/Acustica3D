@@ -101,7 +101,7 @@ export interface OptRequest {
 	/** rejilla: recorre la sala y afina alrededor de los mejores; bayes: elige cada posición que simular
 	 *  según lo aprendido de las anteriores (bayes.ts), con `base + perM2 · m² de zona válida` simulaciones */
 	method: 'rejilla' | 'bayes';
-	bayes: { base: number; perM2: number; max: number };
+	bayes: { base: number; perM2: number; max: number; timeS: number };
 	/** mover también trampas y paneles: los primeros `nStatic` triángulos de `tris` son la sala fija; los
 	 *  objetos van detrás (uno por objeto, con su material `objMat`) */
 	treatment: { nStatic: number; objects: RoomObject[]; objMat: number[] } | null;
@@ -115,7 +115,7 @@ export type OptMsg =
 			type: 'opt-done'; elapsedS: number; top: OptConfig[]; current: OptConfig | null; currentTuned: OptConfig | null; tested: { pos: V3; score: number }[];
 			/** con tratamiento: dónde quedan trampas y paneles, la caja de la sala (para recolocar los paneles
 			 *  al aplicar otra fila) y qué se ha cambiado */
-			layout: RoomObject[] | null; bounds: Bounds | null; log: string[];
+			layout: RoomObject[] | null; bounds: Bounds | null; log: string[]; sims: number;
 	  }
 
 /** Candidato interno: además de la combinación, sus respuestas (para afinar los ajustes sin simular). */
@@ -514,7 +514,15 @@ async function doOptimize(r: OptRequest) {
 	const testedKeys = new Set<string>();
 	const key = (p: V3) => `${Math.round(p[0] * 100)}|${Math.round(p[2] * 100)}`;
 	let done = 0;
+	let sims = 0;
 	let phase = 'Probando tu colocación actual';
+	const elapsed = () => (performance.now() - t0) / 1000;
+	/** ¿se sigue buscando pasado el presupuesto? Solo si queda tiempo (equipos rápidos) y sin pasar de `cap` */
+	const keepGoing = (until: number, cap: number) => (used: number) => {
+		const ok = used < cap && elapsed() < until;
+		if (ok) total++;
+		return ok;
+	};
 
 	const topCands = (n: number) => {
 		const out: Cand[] = [];
@@ -556,6 +564,7 @@ async function doOptimize(r: OptRequest) {
 		const extraBase = receivers.length;
 		if (extra) receivers.push(extra.khL, extra.khR, ...(extra.sub ? [extra.sub] : []));
 		if (!pairs.length && !extra) return [];
+		sims++;
 		const args = {
 			source: P, receivers, durationS: r.durationS, fmax: r.fmax, planeY: null,
 			onProgress: (f: number) => { if (Math.random() < 0.1) step(P, f); }
@@ -647,6 +656,7 @@ async function doOptimize(r: OptRequest) {
 			{
 				budget,
 				nInit: Math.max(6, Math.round(0.4 * budget)),
+				extend: keepGoing(r.bayes.timeS, Math.min(bayesCands.length, 3 * r.bayes.max)),
 				// tu posición actual también enseña algo al modelo (si está en la zona válida)
 				taken: curScore !== null && clear(curP, 0.5) ? [{ p: [curP[0], curP[2]], y: curScore }] : []
 			}
@@ -769,7 +779,8 @@ async function doOptimize(r: OptRequest) {
 			moves.sort((a, b) => b.est - a.est);
 			let tries = 0;
 			for (const m of moves) {
-				if (tries >= 8 || m.est < -1) break;
+				// en un equipo rápido (< 2 s por simulación) se comprueban más cambios
+				if (tries >= (elapsed() / Math.max(1, sims) < 2 ? 20 : 8) || m.est < -1) break;
 				if (occ.includes(m.j)) continue;
 				const list = withTrapAt(m.k, m.j);
 				if (!ok(list)) continue;
@@ -799,7 +810,10 @@ async function doOptimize(r: OptRequest) {
 			if (y !== null) taken.push({ p: [P[0], P[2]], y });
 		}
 		const cands2: P2[] = bayesCands.length ? bayesCands : listenerGrid(BAYES_H, BAYES_H / 2).map((p) => [p[0], p[2]]);
-		await bayesSearch(cands2, async ([x, z]) => test([x, r.listenerY, z]), { budget: budget2, nInit: Math.max(3, Math.round(budget2 / 3)), taken });
+		await bayesSearch(cands2, async ([x, z]) => test([x, r.listenerY, z]), {
+			budget: budget2, nInit: Math.max(3, Math.round(budget2 / 3)), taken,
+			extend: keepGoing(elapsed() + r.bayes.timeS / 2, Math.min(cands2.length, 2 * r.bayes.max))
+		});
 		// los paneles, a las primeras reflexiones de la colocación final
 		layout = placePanels(placed.map((p) => p.o), topCands(1)[0], bounds);
 	}
@@ -821,5 +835,5 @@ async function doOptimize(r: OptRequest) {
 		done++;
 	}
 	total = done;
-	post({ type: 'opt-done', elapsedS: (performance.now() - t0) / 1000, top: top(), current: strip(current), currentTuned: strip(currentTuned), tested, layout, bounds, log });
+	post({ type: 'opt-done', elapsedS: (performance.now() - t0) / 1000, top: top(), current: strip(current), currentTuned: strip(currentTuned), tested, layout, bounds, log, sims });
 }

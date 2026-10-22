@@ -184,7 +184,15 @@ export function proposeNext(cands: P2[], X: P2[], y: number[], gap = 0.05, xi = 
 export async function bayesSearch(
 	cands: P2[],
 	f: (p: P2, phase: 'inicio' | 'bayes') => Promise<number | null>,
-	opts: { budget: number; nInit: number; taken?: { p: P2; y: number }[]; minEi?: number; minAfterInit?: number }
+	opts: {
+		budget: number;
+		nInit: number;
+		taken?: { p: P2; y: number }[];
+		minEi?: number;
+		minAfterInit?: number;
+		/** pasado el presupuesto, ¿se sigue? (p. ej. mientras quede tiempo en un equipo rápido) */
+		extend?: (used: number) => boolean;
+	}
 ): Promise<{ X: P2[]; y: number[] }> {
 	const X: P2[] = [], y: number[] = [];
 	const failed: P2[] = [];
@@ -206,7 +214,7 @@ export async function bayesSearch(
 	const minEi = opts.minEi ?? 0;
 	const minAfterInit = opts.minAfterInit ?? 6;
 	let extra = 0;
-	while (used < opts.budget && y.length >= 2) {
+	while ((used < opts.budget || (opts.extend?.(used) ?? false)) && y.length >= 2) {
 		const nx = proposeNext(cands, X, y);
 		if (!nx) break;
 		if (nx.ei < minEi && extra >= minAfterInit) break;

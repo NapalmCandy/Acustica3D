@@ -140,7 +140,7 @@
 			{#if opt.running}
 				<span class="text-ink">{opt.phase} · posición {Math.min(opt.done + 1, opt.total)} de ~{opt.total}</span>
 			{:else if opt.elapsedS !== null}
-				<span class="text-ink">Terminado en {fmt(opt.elapsedS)} s · {opt.tested.length} posiciones de escucha probadas</span>
+				<span class="text-ink">Terminado en {fmt(opt.elapsedS)} s · {opt.tested.length} posiciones de escucha probadas{opt.sims > opt.tested.length ? ` · ${opt.sims} simulaciones en total` : ''}</span>
 			{/if}
 			{#if opt.engine}<span>{opt.engine}</span>{/if}
 		</div>

@@ -261,11 +261,12 @@ export { cmul };
 let optWorker: Worker | null = null;
 
 /** ppw y rejilla de cada precisión; `bayes`: cuántas posiciones simula la búsqueda bayesiana
- *  (base + por m² de zona válida, con un máximo). Con la sala de prueba simula ~1/3 que la rejilla. */
+ *  (base + por m² de zona válida, con un máximo) y, si el equipo es rápido, cuántos segundos puede
+ *  seguir buscando después (`timeS`). Con la sala de prueba simula ~1/3 que la rejilla. */
 const PRECISION = {
-	rapida: { ppw: 7, step: 0.6, bayes: { base: 10, perM2: 1, max: 40 } },
-	normal: { ppw: 8, step: 0.45, bayes: { base: 14, perM2: 1.6, max: 60 } },
-	fina: { ppw: 10, step: 0.3, bayes: { base: 18, perM2: 2.4, max: 90 } }
+	rapida: { ppw: 7, step: 0.6, bayes: { base: 10, perM2: 1, max: 40, timeS: 60 } },
+	normal: { ppw: 8, step: 0.45, bayes: { base: 14, perM2: 1.6, max: 60, timeS: 240 } },
+	fina: { ppw: 10, step: 0.3, bayes: { base: 18, perM2: 2.4, max: 90, timeS: 900 } }
 } as const;
 
 /** Lanza la búsqueda de la mejor colocación (en un worker aparte: no toca la simulación normal).
@@ -294,7 +295,11 @@ export function runOptimize(retry = false) {
 	if (app.sub.enabled && o.tuneSub) tune.push('xoverHz', 'gainDb', 'hpf85');
 	if (KH_EQ.enabled && o.tuneKh) tune.push('bassDb', 'lowMidDb');
 	const mid = [(P.khL[0] + P.khR[0]) / 2, (P.khL[2] + P.khR[2]) / 2];
-	const curFacing = Math.round((Math.atan2(mid[0] - P.listener[0], -(mid[1] - P.listener[2])) * 180) / Math.PI);
+	// hacia dónde miras ahora; si es casi de frente a una pared (±15°), de frente: la cabeza dibujada no
+	// suele quedar justo en el centro de los KH, y unos grados de más tuercen todo el triángulo
+	const rawFacing = (Math.atan2(mid[0] - P.listener[0], -(mid[1] - P.listener[2])) * 180) / Math.PI;
+	const square = Math.round(rawFacing / 90) * 90;
+	const curFacing = Math.abs(rawFacing - square) <= 15 ? ((square % 360) + 360) % 360 : Math.round(rawFacing);
 	const distances: number[] = [];
 	for (let d = Math.max(0.8, app.listenRange[0]); d <= Math.min(2.0, app.listenRange[1]) + 1e-6; d += 0.1) distances.push(Math.round(d * 100) / 100);
 	const req: OptRequest = {
@@ -317,7 +322,7 @@ export function runOptimize(retry = false) {
 		else if (m.type === 'opt-done') {
 			app.opt = {
 				...app.opt, running: false, testing: null, top: m.top, current: m.current, currentTuned: m.currentTuned, tested: m.tested,
-				done: app.opt.total, phase: 'Terminado', elapsedS: m.elapsedS, layout: m.layout, bounds: m.bounds, log: m.log
+				done: app.opt.total, phase: 'Terminado', elapsedS: m.elapsedS, layout: m.layout, bounds: m.bounds, log: m.log, sims: m.sims
 			};
 			optWorker?.terminate();
 			optWorker = null;

@@ -28,12 +28,14 @@ export interface OptState {
 	layout: RoomObject[] | null;
 	bounds: Bounds | null;
 	log: string[];
+	/** simulaciones hechas en total (también las de probar el tratamiento) */
+	sims: number;
 	elapsedS: number | null;
 	error: string | null;
 }
 export const emptyOpt = (): OptState => ({
 	running: false, phase: '', done: 0, total: 0, frac: 0, testing: null, tested: [], top: [], current: null, currentTuned: null,
-	footprint: null, engine: '', nSub: 0, elapsedS: null, error: null, layout: null, bounds: null, log: []
+	footprint: null, engine: '', nSub: 0, elapsedS: null, error: null, layout: null, bounds: null, log: [], sims: 0
 });
 
 export type DeviceId = 'khL' | 'khR' | 'sub' | 'listener';
