@@ -40,3 +40,10 @@ Detalle de cada carpeta:
   - `t*.json`: agudos por tamaño (antes de corregir el motor).
   - `f14*.json`: diseño final con D = 1,4 (antes de corregir el motor).
   - `r*.json`: la geometría real de la mesa «Arco» (antes de corregir el motor).
+  - `anteriores/`: lo que se guardaba en el área temporal de la sesión.
+    - `estetica.json`: curvas de la mesa útil.
+    - `modelo.json`: modelo antiguo frente al corregido.
+    - `triangulo.json`: primera búsqueda de graves con todos los tamaños.
+    - `mapas_110.json`: mapa de zonas sensibles con el oído a 1,10 m.
+    - `curves*.json`: curvas antiguas.
+    - `kh120_*.json`: directividad leída del manual.
