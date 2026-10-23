@@ -177,3 +177,22 @@ Medido con D = 1,40, el oyente en (2,05, Y 4,19) y la geometría real de `mesaAr
   - gráficas (punto 5);
   - README y CLAUDE.md (punto 6);
   - suite completa y versión 0.10.3 por la corrección del motor (punto 1).
+
+## Opinión del usuario sobre la mesa «Arco» (último mensaje): rehacer la forma
+
+- **Le parece «muy, muy fea»**, sobre todo **el arco del nivel intermedio** (la balda en corona).
+- **Referencias que le gustan (Thomann):**
+  - Studio Desk Commander V2 (todo blanco): https://www.thomann.es/studio_desk_commander_v2_set_all_white.htm
+  - Session Desk Trapez 60: https://www.thomann.es/sessiondesk_trapez_60.htm
+  - No se han podido abrir desde la sesión: la red del entorno lo bloquea. Miradlas antes de diseñar; si siguen bloqueadas, pedid al usuario capturas o que añada `www.thomann.es` a los dominios permitidos.
+- **Idea para la siguiente sesión:**
+  - **Rehacer la geometría** al estilo de esas mesas: líneas rectas, laterales trapezoidales, tablero principal recto, puente o elevador para los KH y la pantalla, y quizá huecos de rack inclinados.
+  - **Mantener lo que funciona en acústica:**
+    - el triángulo de 1,40 m y la posición de la sala;
+    - la ventana absorbente (aletas de 3 mm cada 4 cm sobre lana, forrada de tela) **justo donde rebota el sonido** (a D/2 del oído en la línea de cada KH). Puede ser una franja **recta**, no hace falta que sea un arco: solo tiene que cubrir los dos puntos de rebote con margen;
+    - la balda inclinada unos 8° hacia el oyente;
+    - los KH 3 cm por fuera del canto;
+    - la pantalla con su pie en un recorte del puente;
+    - nada de frente bajo el puente;
+    - 15 cm libres bajo la mesa (Roomba) y nada en el sitio de las piernas.
+  - **Volver a medir** con `mesa/banco/agudos/agudos.spec.ts` (variantes «real», que usan `collect(mesaArco)`; adaptarlas a la nueva función) y comparar con «sin mesa»: 1,56 / 0,53 dB.
