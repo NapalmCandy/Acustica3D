@@ -85,6 +85,9 @@ Prueba de extremo a extremo en Chromium: `node testdata/e2e.mjs URL gpu|cpu`. Co
 
 ## Historial de cambios
 
+### v0.10.1
+- Los materiales con «plástico», «teclado» o «keyboard» en el nombre se toman como «Pantalla / plástico duro» (teclados MIDI). Las mesas propuestas para el Estudio v0.05 están en `mesa/` en la raíz del repositorio.
+
 ### v0.10.0
 - **Colocación automática ULTRA** (Precisión «ULTRA (≈ 1 h)»), para encontrar la mejor combinación aunque tarde:
   - KH cada 5 cm (en vez de 10) y aperturas de 45° a 75° cada 5°; el sub en una rejilla de 12,5 cm (en vez de 25). Para no multiplicar por 10 lo que cuesta puntuar (≈ 6 µs por combinación), se puntúa como siempre (KH cada 10 cm con 50/60/70°, sub cada 25 cm) y se afina alrededor de las 12 mejores parejas (±5 cm, ±5°) con el sub cada 12,5 cm cerca de sus 3 mejores sitios; las respuestas de cada punto se calculan solo si se usan;

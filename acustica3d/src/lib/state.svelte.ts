@@ -78,6 +78,7 @@ export function guessMaterial(name: string): string {
 		[/sofa|sofá|sillon|sillón|couch|cama|bed/, 'sofa'],
 		[/pantalla|screen|monitor ?pc|samsung|logo|televis/, 'pantalla'],
 		[/metal|acero|hierro|alumin|steel/, 'metal'],
+		[/pl[aá]stico|plastic|teclado|keyboard/, 'pantalla'],
 		[/altavoz|speaker|neumann|studio ?monitor|monitor de estudio|persona|oyente|human|silla|chair|eyeball|cota|dimension|guide|guía/, 'ignorar']
 	];
 	for (const [re, id] of rules) if (re.test(n)) return id;
