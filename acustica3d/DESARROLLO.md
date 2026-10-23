@@ -85,6 +85,9 @@ Prueba de extremo a extremo en Chromium: `node testdata/e2e.mjs URL gpu|cpu`. Co
 
 ## Historial de cambios
 
+### v0.10.2
+- Directividad del KH: la parte horizontal (y la caída de detrás) se pondera por el coseno de la elevación. Antes saltaba unos 10 dB al pasar por la vertical del altavoz (el ángulo horizontal pasaba de 0° a 180°), lo que afectaba a los caminos muy hacia abajo, como el borde del tablero bajo el KH.
+
 ### v0.10.1
 - Los materiales con «plástico», «teclado» o «keyboard» en el nombre se toman como «Pantalla / plástico duro» (teclados MIDI). Las mesas propuestas para el Estudio v0.05 están en `mesa/` en la raíz del repositorio.
 

@@ -295,7 +295,8 @@ function dirTable(T: number[][], ang: number, f: number): number {
 
 /** Directividad del KH 120 (dB respecto a su eje) en la dirección `dir` para un altavoz que apunta a
  *  `aim` y está de pie (tweeter arriba): ángulo horizontal y vertical respecto al eje, con las tablas
- *  medidas por Neumann (sumadas en dB: aproximación separable) y, detrás, una caída estimada. */
+ *  medidas por Neumann (sumadas en dB: aproximación separable, con lo horizontal ponderado por el coseno de
+ *  la elevación) y, detrás, una caída estimada. */
 export function khDirectivityDb(dir: V3, aim: V3, f: number): number {
 	const fwd = unit(aim);
 	// «arriba» del altavoz: la vertical, sin la parte que va a lo largo del eje
@@ -306,9 +307,11 @@ export function khDirectivityDb(dir: V3, aim: V3, f: number): number {
 	const xf = dot(d, fwd), xr = dot(d, right), xu = dot(d, up);
 	const h = (Math.abs(Math.atan2(xr, xf)) * 180) / Math.PI; // 0–180
 	const v = (Math.atan2(xu, Math.hypot(xf, xr)) * 180) / Math.PI; // −90 (abajo) … 90 (arriba)
-	let db = dirTable(KH120_DIR_H, Math.min(90, h), f) + dirTable(v >= 0 ? KH120_DIR_UP : KH120_DIR_DOWN, Math.abs(v), f);
-	if (h > 90) db += (octInterp(REAR_DB, f) * (h - 90)) / 90;
-	return db;
+	// lo horizontal (y la caída de detrás) pesa menos cuanto más hacia arriba o hacia abajo: en la vertical
+	// del altavoz el ángulo horizontal no significa nada y así no hay salto al pasar por ella
+	let hdb = dirTable(KH120_DIR_H, Math.min(90, h), f);
+	if (h > 90) hdb += (octInterp(REAR_DB, f) * (h - 90)) / 90;
+	return hdb * Math.cos((v * Math.PI) / 180) + dirTable(v >= 0 ? KH120_DIR_UP : KH120_DIR_DOWN, Math.abs(v), f);
 }
 
 /** Factor de directividad Q del KH 120 por octava (63 Hz – 16 kHz): 4π entre la integral de la

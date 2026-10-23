@@ -1,6 +1,6 @@
 // Mesas acústicas para el Estudio v0.05: genera los .dae para importar en SketchUp (Z arriba, en el
 // origen del modelo, metros de SketchUp: X a lo ancho, Y hacia la pared frontal, Z arriba).
-// Uso: node mesa/gen_mesas.mjs   → mesa/Mesa_con_lana.dae y mesa/Mesa_sin_lana.dae
+// Uso: node mesa/gen_mesas.mjs   → mesa/Mesa_con_lana.dae, mesa/Mesa_sin_lana.dae y mesa/Mesa_tres_cuerpos.dae
 import { writeFileSync } from 'node:fs';
 
 const COLOR = {
@@ -61,6 +61,26 @@ function sinLana(G) {
 	khStands(G);
 }
 
+function tresCuerpos(G) {
+	// tu idea de tres cuerpos que se meten uno dentro de otro (con ruedas de 7 cm), rehecha con el mapa de
+	// zonas sensibles: nada en la zona del punto de rebote ni cerca del camino directo
+	const T = 0.02, R = 0.071; // grosor del tablero y altura de las ruedas
+	const side = (name, x, y0, y1, zTop) => G(name, 'Madera DM', box([x, y0, R], [x + T, y1, zTop - T]));
+	// alto: los KH, con su frontal al ras del borde (Y 5,55); 185 × 40 cm a 95 cm
+	G('Alto - tablero de los KH', 'Madera DM', box([1.131, 5.55, 0.95 - T], [2.981, 5.95, 0.95]));
+	side('Alto - lateral izquierdo', 1.131, 5.55, 5.95, 0.95);
+	side('Alto - lateral derecho', 2.961, 5.55, 5.95, 0.95);
+	G('Alto - trasera baja', 'Madera DM', box([1.151, 5.93, R], [2.961, 5.95, 0.5]));
+	// medio: la pantalla y aparatos pequeños; 105 × 38 cm a 74 cm, entre los dos KH y detrás (Y 5,40)
+	G('Medio - tablero', 'Madera DM', box([1.53, 5.4, 0.74 - T], [2.58, 5.78, 0.74]));
+	side('Medio - lateral izquierdo', 1.53, 5.4, 5.78, 0.74);
+	side('Medio - lateral derecho', 2.56, 5.4, 5.78, 0.74);
+	// bajo: teclado y ratón; 96 × 28 cm a 62 cm, cerca de ti (Y 4,45)
+	G('Bajo - tablero', 'Madera DM', box([1.575, 4.45, 0.62 - T], [2.535, 4.73, 0.62]));
+	side('Bajo - lateral izquierdo', 1.575, 4.45, 4.73, 0.62);
+	side('Bajo - lateral derecho', 2.515, 4.45, 4.73, 0.62);
+}
+
 function dae(build) {
 	const groups = [];
 	build((name, mat, ...solids) => groups.push({ name, mat, solids }));
@@ -90,4 +110,5 @@ function dae(build) {
 
 writeFileSync(new URL('./Mesa_con_lana.dae', import.meta.url), dae(conLana));
 writeFileSync(new URL('./Mesa_sin_lana.dae', import.meta.url), dae(sinLana));
-console.log('ok: mesa/Mesa_con_lana.dae, mesa/Mesa_sin_lana.dae');
+writeFileSync(new URL('./Mesa_tres_cuerpos.dae', import.meta.url), dae(tresCuerpos));
+console.log('ok: mesa/Mesa_con_lana.dae, mesa/Mesa_sin_lana.dae, mesa/Mesa_tres_cuerpos.dae');
