@@ -51,6 +51,8 @@ export const LIBRARY: AcousticMaterial[] = [
 	{ id: 'pantalla', name: 'Pantalla / plástico duro', kind: 'table',
 	  alpha: [0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.02, 0.02], color: '#3a3a3f',
 	  note: 'Pantalla de ordenador o televisor: superficie dura que refleja casi todo; importa sobre todo en medios y agudos.' },
+	{ id: 'metal', name: 'Metal (pies, estructuras)', kind: 'table',
+	  alpha: [0.01, 0.01, 0.01, 0.02, 0.02, 0.02, 0.02, 0.02], color: '#4a4a50' },
 	{ id: 'sofa', name: 'Sofá / sillón tapizado', kind: 'table',
 	  alpha: [0.15, 0.2, 0.4, 0.55, 0.6, 0.6, 0.6, 0.6], color: '#7a6f64' },
 	{ id: 'panel_lana_roca', name: 'Panel de lana de roca (calculado)', kind: 'porous', alpha: [],

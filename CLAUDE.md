@@ -27,7 +27,7 @@ Idioma de trabajo: **español**. El usuario produce hardcore/gabber, escucha alt
 
 ## Acustica3D: puntos clave
 - **Desarrollo:**
-  - `npm install` (`.npmrc` con legacy-peer-deps), `npm run dev`, `npx vitest run` (47 pruebas), `npm run build`.
+  - `npm install` (`.npmrc` con legacy-peer-deps), `npm run dev`, `npx vitest run` (61 pruebas), `npm run build`.
   - Prueba completa: `node testdata/e2e.mjs http://localhost:4173/ cpu|gpu`, con `vite preview` en marcha. Reinicia preview tras cada build.
   - No uses `pkill -f` con un patrón que aparezca en la misma orden.
 - **Simulación:**
@@ -45,7 +45,8 @@ Idioma de trabajo: **español**. El usuario produce hardcore/gabber, escucha alt
   - Después ajusta el Sub8 (corte, nivel, fase, filtro de 85 Hz) y los interruptores Bass/Low-Mid de los KH en las 40 mejores colocaciones, probando todas las combinaciones (`tuneSettings`).
 - **Interruptores del KH 120 A:** `KH_EQ` en `acoustics/speakers.ts`, ajustados a la gráfica del manual de Neumann (pág. 25): Bass, estante de 183 Hz y Q 0,62; Low-Mid, campana de 260 Hz y Q 0,36; Treble, estante de 5,4 kHz y Q 0,84.
 - **Mapa de la sala:** de 20 a 300 Hz, con animación precalculada (`mapAnim.svelte.ts`, `doFrames`).
-- **Medios y agudos** (pestaña `agudos`, `hf/imageSource.ts` en `hf/hf.worker.ts`): método de la imagen hasta orden 1–4 con oclusión, directividad del KH 120 medida por Neumann (`hf/kh120Directivity.ts`, leída del manual con `scripts/kh120_directividad.py`; detrás de ±90° estimada), aire y absorción por octavas + cola difusa (Eyring, Q integrado). Reflectograma y zona libre de reflexiones. Pendiente: difusión, dos oídos (HRTF), unir con los graves (cruce ~300–500 Hz).
+- **Medios y agudos** (pestaña `agudos`, `hf/imageSource.ts` en `hf/hf.worker.ts`): método de la imagen hasta orden 1–4 con oclusión y **difracción por zonas de Fresnel** (`hf/fresnel.ts`: integral de Fresnel–Kirchhoff sobre la parte libre/cubierta de la zona de Fresnel de cada tramo y rebote, muestreada con rayos en una BVH; caminos solo por difracción hasta orden 2; lado de cada cara que da al aire por paridad respecto al oído), directividad del KH 120 medida por Neumann (`hf/kh120Directivity.ts`, leída del manual con `scripts/kh120_directividad.py`; detrás de ±90° estimada), aire y absorción por octavas + cola difusa (Eyring, Q integrado). Reflectograma y zona libre de reflexiones. Pendiente: difusión, dos oídos (HRTF), unir con los graves (cruce ~300–500 Hz).
+- **Mesa acústica** propuesta (oct. 2026, fuera del repo, generada con un script en la sesión): tablero de 185 × 88 cm a 73 cm, franja de lana de roca 80 kg/m³ de 5 cm × 30 cm de fondo a 23 cm del borde, KH en pies de suelo detrás (bandeja a 95 cm), pantalla bajada 9 cm, 5 cm hacia el oyente e inclinada 8°. Desviación de la respuesta (300 Hz–4 kHz, 1/6 oct) de 2,9 dB con la mesa dibujada a ~1,1 dB. La lana dentro de un grupo «mesa» se queda fija (`scene.ts`).
 - **Lanzador:** Edge con `--force_high_performance_gpu` (el usuario tiene una RTX 3080 y Edge cogía la integrada).
 - **Artifact web** (privado): https://claude.ai/artifact/V2mNhwfGzLEqnW9TUmchmo.
   - Se genera con `node scripts_artifact.mjs`; usa `appDir: 'app'` porque el servicio no admite rutas con `_`.

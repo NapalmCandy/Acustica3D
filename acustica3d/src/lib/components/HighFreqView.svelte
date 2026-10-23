@@ -23,7 +23,7 @@
 	const inputKey = $derived.by(() => {
 		if (!app.tris) return '';
 		const ign = app.materialNames.filter((n) => app.matMap[n]?.libId === 'ignorar').join('|');
-		return JSON.stringify([app.modelName, app.tris.materials.length, ign, app.objects, app.positions.khL, app.positions.khR, app.positions.listener, order]);
+		return JSON.stringify([app.modelName, app.tris.materials.length, ign, app.objects, app.positions.khL, app.positions.khR, app.positions.listener, order, app.matMap]);
 	});
 	$effect(() => {
 		const key = inputKey;
@@ -49,9 +49,18 @@
 					busy = false;
 					error = e.message || 'El cálculo de reflexiones se ha cortado.';
 				};
+				const aim = (s: V3): V3 => {
+					const d = [pos.listener[0] - s[0], pos.listener[1] - s[1], pos.listener[2] - s[2]], l = Math.hypot(d[0], d[1], d[2]) || 1;
+					return [d[0] / l, d[1] / l, d[2] / l];
+				};
 				const req: HfRequest = {
 					reqId: id, tris: inp.tris, triMat: inp.triMat, ear: pos.listener, maxOrder: order,
-					sources: [{ id: 'khL', pos: pos.khL }, { id: 'khR', pos: pos.khR }]
+					sources: [{ id: 'khL', pos: pos.khL }, { id: 'khR', pos: pos.khR }],
+					aims: { khL: aim(pos.khL), khR: aim(pos.khR) },
+					alpha: inp.names.map((n) => {
+						const a = app.alphaOf(n);
+						return [...a, a[a.length - 1]];
+					})
 				};
 				worker.postMessage(req, [req.tris.buffer, req.triMat.buffer]);
 			} catch (e) {
@@ -231,6 +240,7 @@
 					<div class="pointer-events-none absolute top-1 rounded-md border border-line bg-panel px-2 py-1.5 text-xs shadow-md" style="left:{Math.min(rx(hover.ms) + 10, rw - 260)}px">
 						<div class="font-semibold text-ink">{hover.p.src === 'khL' ? 'KH izquierdo' : 'KH derecho'} · {fmt(hover.ms)} ms · {fmt(hover.db)} dB</div>
 						<div class="text-ink">{hover.p.mats.map(surf).join(' → ')}</div>
+						{#if hover.p.soft}<div class="text-muted">llega por difracción (rodea un borde o cae junto a una superficie)</div>{/if}
 					</div>
 				{/if}
 			</div>
@@ -254,7 +264,7 @@
 						{#each problems.slice(0, 14) as r}
 							<tr class="border-t border-line text-ink">
 								<td>{r.p.src === 'khL' ? 'izq.' : 'der.'}</td><td class="text-right tabular-nums">{fmt(r.ms)}</td><td class="text-right tabular-nums">{fmt(r.db)}</td>
-								<td class="pl-2">{#each r.p.mats as m, i}<div>{surf(m)} <span class="text-muted">({sk(r.p.points[i + 1])})</span></div>{/each}</td>
+								<td class="pl-2">{#each r.p.mats as m, i}<div>{surf(m)} <span class="text-muted">({sk(r.p.points[i + 1])})</span></div>{/each}{#if r.p.soft}<div class="text-muted">por difracción en un borde</div>{/if}</td>
 							</tr>
 						{/each}
 					</tbody>
@@ -265,9 +275,10 @@
 			<p class="mb-1 font-medium text-ink">Cómo se calcula</p>
 			<ul class="list-disc space-y-1 pl-4">
 				<li>Por encima de unos cientos de Hz el sonido se comporta como rayos: cada reflexión es una fuente «imagen» detrás de la superficie. Se buscan todas las que llegan a tu oído hasta el orden elegido, comprobando que el rebote cae en una superficie real y que nada tapa el camino (la mesa, la pantalla, las trampas…).</li>
+				<li>Difracción: en medios el sonido rodea los bordes (a 500 Hz la zona de Fresnel de un camino de 1,5 m mide unos 40 cm). Cada camino se pondera por octava con la integral de Fresnel–Kirchhoff sobre la parte libre de su zona de Fresnel, y en cada rebote con la parte que cae sobre la superficie: una pantalla pequeña apenas refleja en medios, el borde de una repisa deja pasar parte de lo que tapa y aparecen reflexiones que el método de la imagen solo no vería («por difracción»).</li>
 				<li>Cada rebote pierde lo que absorbe su material en esa octava; la directividad de los KH 120 A (apuntando a tu oído) y el aire atenúan los agudos. Después se suma la cola difusa de la sala (Eyring).</li>
 				<li>Desmarca «cuenta» en un material (la mesa) y se recalcula al momento: así ves cuánto cambia.</li>
-				<li>La directividad del KH 120 es la medida por Neumann (diagramas horizontal y vertical del manual); detrás del altavoz, estimada. Las superficies son espejos (sin difusión) y hay un solo punto de escucha (sin la forma de la cabeza). Por debajo de ~300 Hz manda la simulación de graves.</li>
+				<li>La directividad del KH 120 es la medida por Neumann (diagramas horizontal y vertical del manual); detrás del altavoz, estimada. Sin difusión por rugosidad, y un solo punto de escucha (sin la forma de la cabeza). Por debajo de ~300 Hz manda la simulación de graves.</li>
 			</ul>
 		</div>
 	</div>

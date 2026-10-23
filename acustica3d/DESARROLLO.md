@@ -48,11 +48,12 @@ La prueba sintética (`skp.spec.ts`) construye un `.skp` mínimo. Con `SKP_FILE=
 | **Materiales** | Coeficientes típicos por octavas. Paneles de lana de roca calculados con el modelo de Miki (grosor, densidad, cámara de aire) y la integral de Paris. Conversión a admitancia equivalente para los graves. |
 | **KH 120 A** | Modelo calibrado de la Fase 2 (Thiele-Small, reflex y electrónica). |
 | **Sub8** | Estimado: 4.º orden a 28 Hz y cruce LR4. Se afinará midiendo. |
+| **Medios y agudos** | Método de la imagen (orden 1–4) con la directividad del KH 120 medida por Neumann, absorción por octavas y aire, más la cola difusa (Eyring). **Difracción por zonas de Fresnel** (`hf/fresnel.ts`): cada camino se pondera por octava (250 Hz – 16 kHz) con la integral de Fresnel–Kirchhoff sobre la parte libre de su zona de Fresnel en cada tramo y sobre la parte que cae en la superficie en cada rebote. Esa parte se busca con rayos (BVH) en 8 direcciones y 8 anillos, con bisección del radio del borde; el ángulo se integra con el borde interpolado como recta (exacto para un borde recto). Cada tramo se parte en 4 trozos que solo miran lo que tienen cerca, y cuenta el más tapado. Los caminos que solo llegan por difracción (rebote junto a una superficie o camino tapado) se buscan hasta orden 2. Solo reflejan los lados de cada triángulo que están en la misma región que el oído (paridad de cortes de 5 rayos), así la cara de abajo de un tablero no refleja lo que llega por arriba. Antes de calcular la difracción se descartan los caminos que no llegarían a −30 dB del directo. |
 | **Combinación** | Las respuestas de altavoz y cruce se combinan en frecuencia. El cruce, el nivel, la fase y el retardo del sub se cambian sin volver a simular. |
 
 ### Validación
 
-`npx vitest run`, 30 pruebas. Las de física (más la de reciprocidad):
+`npx vitest run`, 61 pruebas. Las de física (más la de reciprocidad):
 - **Campo libre:** 0 dB ± 1 dB a 1 m.
 - **Sala rígida:** modos a menos del 2,5 % de c/2L.
 - **Inversión α↔β** coherente.
@@ -68,6 +69,11 @@ Las del mapa de posición:
 - la geometría centra el punto;
 - las cajas de los objetos giradas son correctas.
 
+Las de difracción (`hf/fresnel.spec.ts`):
+- un borde recto da la difracción de Fresnel–Kirchhoff (±2,5 dB de 500 Hz a 4 kHz, a la luz y a la sombra);
+- un reflector de 20 × 20 cm apenas refleja a 500 Hz y casi entero a 16 kHz; uno grande, todo;
+- la cara de abajo de un tablero no refleja lo que llega por arriba.
+
 Las de la búsqueda bayesiana (`bayes.spec.ts`), con una puntuación sintética de varios máximos:
 - el proceso gaussiano pasa por los puntos medidos y duda lejos de ellos;
 - los puntos de partida se reparten por la sala;
@@ -78,6 +84,11 @@ Prueba de extremo a extremo en Chromium: `node testdata/e2e.mjs URL gpu|cpu`. Co
 
 
 ## Historial de cambios
+
+### v0.9.0
+- **Difracción en medios y agudos** (`hf/fresnel.ts`): ver Física. Cambia sobre todo lo que pasa cerca de la mesa y de la pantalla: el rebote en una bandeja de teclado tapado a medias por el borde de una repisa (que antes se descartaba entero) llega a −15 dB, el borde de una repisa bajo los KH difracta, una pantalla pequeña apenas refleja en medios. En la tabla y el reflectograma, «por difracción en un borde».
+- Comprobación de oclusión con un árbol de cajas (BVH) en vez de la rejilla uniforme: la pantalla dibujada tiene 10 000 triángulos en muy poco sitio.
+- La lana dentro de un grupo llamado «mesa»/«escritorio» se queda fija como parte de la mesa (no pasa a ser un panel movible). Material nuevo «Metal» (pies, estructuras).
 
 ### v0.8.1
 - Directividad del KH 120 **medida por Neumann** (diagramas de isobaras horizontal y vertical del manual, pág. III) en vez de estimada: `hf/kh120Directivity.ts`, generado con `scripts/kh120_directividad.py` desde la página rasterizada a 400 ppp. Horizontal (media de los dos lados) + vertical hacia arriba y hacia abajo (los nulos del cruce a ±50° hacia 2 kHz), sumadas en dB; detrás de ±90°, caída estimada. El Q del campo difuso sale de integrar esa directividad sobre la esfera.

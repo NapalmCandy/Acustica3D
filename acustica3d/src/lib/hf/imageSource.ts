@@ -9,6 +9,7 @@
 // (la cola difusa) se suma aparte, de forma estadística.
 import type { V3 } from '../sim/voxel';
 import { KH120_DIR_FREQS, KH120_DIR_H, KH120_DIR_UP, KH120_DIR_DOWN } from './kh120Directivity';
+import { Bvh, FresnelScene, fresnelR } from './fresnel';
 
 export interface Plane {
 	n: V3; // normal unitaria
@@ -24,6 +25,11 @@ export interface Path {
 	points: V3[]; // fuente, puntos de rebote y oído
 	mats: number[]; // material de cada rebote
 	leave: V3; // dirección en que sale del altavoz (para su directividad)
+	/** lo que deja pasar la zona de Fresnel en cada octava de HF_OCTAVES (difracción; sin él, 1) */
+	fres?: number[];
+	/** el método de la imagen solo no lo encontraría: llega por difracción (rebote fuera de la
+	 *  superficie o camino tapado) */
+	soft?: boolean;
 }
 
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -61,89 +67,11 @@ export function buildPlanes(tris: Float32Array, triMat: Int32Array): { planes: P
 	return { planes, triPlane };
 }
 
-/** Rejilla uniforme de triángulos para saber rápido qué puede tapar un segmento. */
-class TriGrid {
-	lo: V3;
-	h: number;
-	n: [number, number, number];
-	cells: Map<number, number[]> = new Map();
-	stamp: Int32Array;
-	tick = 0;
-	constructor(private tris: Float32Array, nTris: number, use: (t: number) => boolean, h = 0.3) {
-		this.h = h;
-		const lo: V3 = [Infinity, Infinity, Infinity], hi: V3 = [-Infinity, -Infinity, -Infinity];
-		for (let t = 0; t < nTris; t++) {
-			if (!use(t)) continue;
-			for (let k = 0; k < 9; k++) (lo[k % 3] = Math.min(lo[k % 3], tris[t * 9 + k])), (hi[k % 3] = Math.max(hi[k % 3], tris[t * 9 + k]));
-		}
-		this.lo = lo.map((v) => v - 1e-3) as V3;
-		this.n = [0, 1, 2].map((k) => Math.max(1, Math.ceil((hi[k] - lo[k] + 2e-3) / h))) as [number, number, number];
-		this.stamp = new Int32Array(nTris);
-		for (let t = 0; t < nTris; t++) {
-			if (!use(t)) continue;
-			const a = [0, 1, 2].map((k) => Math.min(tris[t * 9 + k], tris[t * 9 + 3 + k], tris[t * 9 + 6 + k]));
-			const b = [0, 1, 2].map((k) => Math.max(tris[t * 9 + k], tris[t * 9 + 3 + k], tris[t * 9 + 6 + k]));
-			const c0 = a.map((v, k) => this.cl(Math.floor((v - this.lo[k]) / h), k));
-			const c1 = b.map((v, k) => this.cl(Math.floor((v - this.lo[k]) / h), k));
-			for (let x = c0[0]; x <= c1[0]; x++)
-				for (let y = c0[1]; y <= c1[1]; y++)
-					for (let z = c0[2]; z <= c1[2]; z++) {
-						const key = x + this.n[0] * (y + this.n[1] * z);
-						let l = this.cells.get(key);
-						if (!l) this.cells.set(key, (l = []));
-						l.push(t);
-					}
-		}
-	}
-	private cl(v: number, k: number) {
-		return Math.max(0, Math.min(this.n[k] - 1, v));
-	}
-	/** ¿Corta algún triángulo (que no sea de los planos `skip`) el segmento a→b? */
-	blocked(a: V3, b: V3, skip: (t: number) => boolean): boolean {
-		const T = this.tris;
-		const d = sub(b, a);
-		const stamp = ++this.tick;
-		// recorrido de las celdas por las que pasa el segmento (Amanatides–Woo)
-		const cell = [0, 1, 2].map((k) => this.cl(Math.floor((a[k] - this.lo[k]) / this.h), k));
-		const end = [0, 1, 2].map((k) => this.cl(Math.floor((b[k] - this.lo[k]) / this.h), k));
-		const step = d.map((v) => (v > 0 ? 1 : v < 0 ? -1 : 0));
-		const tMax = [0, 1, 2].map((k) => (step[k] === 0 ? Infinity : ((this.lo[k] + (cell[k] + (step[k] > 0 ? 1 : 0)) * this.h - a[k]) / d[k])));
-		const tDelta = [0, 1, 2].map((k) => (step[k] === 0 ? Infinity : this.h / Math.abs(d[k])));
-		for (let guard = 0; guard < 10000; guard++) {
-			const list = this.cells.get(cell[0] + this.n[0] * (cell[1] + this.n[1] * cell[2]));
-			if (list)
-				for (const t of list) {
-					if (this.stamp[t] === stamp) continue;
-					this.stamp[t] = stamp;
-					if (skip(t)) continue;
-					const o = t * 9;
-					const e1x = T[o + 3] - T[o], e1y = T[o + 4] - T[o + 1], e1z = T[o + 5] - T[o + 2];
-					const e2x = T[o + 6] - T[o], e2y = T[o + 7] - T[o + 1], e2z = T[o + 8] - T[o + 2];
-					const px = d[1] * e2z - d[2] * e2y, py = d[2] * e2x - d[0] * e2z, pz = d[0] * e2y - d[1] * e2x;
-					const det = e1x * px + e1y * py + e1z * pz;
-					if (Math.abs(det) < 1e-12) continue;
-					const sx = a[0] - T[o], sy = a[1] - T[o + 1], sz = a[2] - T[o + 2];
-					const u = (sx * px + sy * py + sz * pz) / det;
-					if (u < 0 || u > 1) continue;
-					const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
-					const v = (d[0] * qx + d[1] * qy + d[2] * qz) / det;
-					if (v < 0 || u + v > 1) continue;
-					const tt = (e2x * qx + e2y * qy + e2z * qz) / det;
-					if (tt > 1e-4 && tt < 1 - 1e-4) return true;
-				}
-			if (cell[0] === end[0] && cell[1] === end[1] && cell[2] === end[2]) break;
-			const k = tMax[0] < tMax[1] ? (tMax[0] < tMax[2] ? 0 : 2) : tMax[1] < tMax[2] ? 1 : 2;
-			if (tMax[k] > 1) break;
-			cell[k] += step[k];
-			tMax[k] += tDelta[k];
-		}
-		return false;
-	}
-}
-
-/** Triángulo del plano que contiene el punto (ya sobre el plano), o −1. */
-function triAt(tris: Float32Array, pl: Plane, p: V3): number {
+/** Triángulo del plano que contiene el punto (ya sobre el plano), o −1. Con `air`, solo los que dan al
+ *  aire por el lado `side` del plano (+1: el de su normal). */
+function triAt(tris: Float32Array, pl: Plane, p: V3, side = 0, air?: (t: number) => number): number {
 	for (const t of pl.tris) {
+		if (air && side && !(air(t) & (side > 0 ? 1 : 2))) continue;
 		const o = t * 9;
 		const a: V3 = [tris[o], tris[o + 1], tris[o + 2]];
 		const v0 = sub([tris[o + 3], tris[o + 4], tris[o + 5]], a), v1 = sub([tris[o + 6], tris[o + 7], tris[o + 8]], a), v2 = sub(p, a);
@@ -156,31 +84,102 @@ function triAt(tris: Float32Array, pl: Plane, p: V3): number {
 	return -1;
 }
 
+/** direcciones para saber si un punto está dentro de un sólido (contando cortes); no alineadas con nada */
+const PARITY_DIRS: V3[] = [[0.31, 0.83, 0.46], [-0.72, 0.21, 0.66], [0.55, -0.64, 0.53], [-0.27, -0.38, -0.88], [0.86, 0.12, -0.49]].map((d) => unit(d as V3));
+
+/** Qué lados de cada triángulo dan al aire (bit 1: el de la normal del plano; bit 2: el otro): los que
+ *  están en la misma región que el oído, contando cuántas veces corta la geometría un rayo desde un punto
+ *  a 3 mm de cada lado y desde el oído (misma paridad = misma región; por mayoría, 4 de 5 rayos). Así la
+ *  cara de abajo de un tablero no refleja lo que viene de arriba, ni la de fuera de una pared. Si la
+ *  malla no está cerrada, no hay mayoría y valen los dos lados. Se calcula al usar cada triángulo. */
+function airSides(tris: Float32Array, planes: Plane[], triPlane: Int32Array, bvh: Bvh, ear: V3) {
+	const cache = new Uint8Array(triPlane.length); // 0: sin calcular
+	const far = (P: V3, d: V3): V3 => [P[0] + 60 * d[0], P[1] + 60 * d[1], P[2] + 60 * d[2]];
+	const earPar = PARITY_DIRS.map((d) => bvh.crossings(ear, far(ear, d)) % 2);
+	return (t: number): number => {
+		if (cache[t]) return cache[t];
+		const n = planes[triPlane[t]].n, o = t * 9;
+		const c: V3 = [(tris[o] + tris[o + 3] + tris[o + 6]) / 3, (tris[o + 1] + tris[o + 4] + tris[o + 7]) / 3, (tris[o + 2] + tris[o + 5] + tris[o + 8]) / 3];
+		let bits = 0;
+		for (const [bit, sg] of [[1, 1], [2, -1]] as const) {
+			const P: V3 = [c[0] + sg * 0.003 * n[0], c[1] + sg * 0.003 * n[1], c[2] + sg * 0.003 * n[2]];
+			let other = 0;
+			PARITY_DIRS.forEach((d, i) => {
+				if (bvh.crossings(P, far(P, d)) % 2 !== earPar[i]) other++;
+			});
+			if (other < 4) bits |= bit;
+		}
+		return (cache[t] = bits || 3);
+	};
+}
+
 export interface FindOptions {
 	maxOrder: number;
 	/** superficie mínima de un plano para el primer rebote y para los siguientes (m²) */
 	minArea1?: number;
 	minAreaN?: number;
+	/** difracción aproximada por zonas de Fresnel (fresnel.ts); sin ella, todo o nada */
+	diffraction?: boolean;
+	/** hasta qué orden se buscan caminos que solo llegan por difracción (por defecto 2: los de más
+	 *  rebotes son débiles y son la mayor parte del cálculo) */
+	softOrder?: number;
+	/** para no calcular la difracción de caminos que no van a llegar a nada: eje de cada fuente,
+	 *  absorción de cada material por octava (HF_OCTAVES) y nivel mínimo respecto al directo (dB) */
+	prune?: { aim: Record<string, V3>; alpha: number[][]; minDb: number };
 }
 
-/** Todos los caminos (directo y reflexiones hasta `maxOrder`) de cada fuente al oído. */
+/** sin `prune`: por debajo de esto (en todas las octavas desde 500 Hz) un camino no se guarda */
+const MIN_FRES_DB = -30;
+
+/** Todos los caminos (directo y reflexiones hasta `maxOrder`) de cada fuente al oído. Con difracción
+ *  (por defecto) cada camino lleva en `fres` lo que deja pasar su zona de Fresnel por octava, y se
+ *  guardan también los que el método de la imagen descarta por poco (rebote fuera de la superficie o
+ *  camino tapado) si por difracción llega algo. */
 export function findPaths(tris: Float32Array, triMat: Int32Array, sources: { id: string; pos: V3 }[], ear: V3, o: FindOptions): Path[] {
 	const { planes, triPlane } = buildPlanes(tris, triMat);
-	const grid = new TriGrid(tris, triMat.length, (t) => triMat[t] >= 0);
+	const bvh = new Bvh(tris, triMat.length, (t) => triMat[t] >= 0, triPlane);
+	const soft = o.diffraction ?? true;
+	const softOrder = o.softOrder ?? 2;
 	const big1 = planes.map((p, i) => (p.area >= (o.minArea1 ?? 0.002) ? i : -1)).filter((i) => i >= 0);
 	const bigN = planes.map((p, i) => (p.area >= (o.minAreaN ?? 0.15) ? i : -1)).filter((i) => i >= 0);
+	// caja de cada plano, para descartar rápido los rebotes que caen lejos de él
+	const pbox = planes.map((pl) => {
+		const lo: V3 = [Infinity, Infinity, Infinity], hi: V3 = [-Infinity, -Infinity, -Infinity];
+		for (const t of pl.tris) for (let k = 0; k < 9; k++) (lo[k % 3] = Math.min(lo[k % 3], tris[t * 9 + k])), (hi[k % 3] = Math.max(hi[k % 3], tris[t * 9 + k]));
+		return { lo, hi };
+	});
+	const boxDist = (q: number, p: V3) => {
+		const { lo, hi } = pbox[q];
+		return Math.hypot(Math.max(0, lo[0] - p[0], p[0] - hi[0]), Math.max(0, lo[1] - p[1], p[1] - hi[1]), Math.max(0, lo[2] - p[2], p[2] - hi[2]));
+	};
+	// difracción de 250 Hz a 16 kHz (por debajo, como a 250 Hz: ahí ya no vale la acústica geométrica)
+	const FROM = HF_OCTAVES.indexOf(250), B500 = HF_OCTAVES.indexOf(500);
+	const lam = HF_OCTAVES.slice(FROM).map((f) => C_SOUND / f);
+	const NB = lam.length;
+	const air = soft ? airSides(tris, planes, triPlane, bvh, ear) : undefined;
+	const fz = new FresnelScene(bvh, planes, (q, p, side) => triAt(tris, planes[q], p, side, air) >= 0, lam);
+	const fac = new Array<number>(NB);
+	const minDb = o.prune?.minDb ?? MIN_FRES_DB;
+	/** ¿llega el camino a algo en alguna octava desde 500 Hz? (`gain`: su nivel sin difracción, dB) */
+	const enough = (gain: number[], f: number[]) => {
+		for (let k = B500 - FROM; k < NB; k++) if (gain[k] + 20 * Math.log10(f[k] + 1e-12) >= minDb) return true;
+		return false;
+	};
+
 	const out: Path[] = [];
 	for (const s of sources) {
 		const S = s.pos;
-		out.push({ src: s.id, order: 0, length: len(sub(ear, S)), points: [S, ear], mats: [], leave: unit(sub(ear, S)) });
 		const chain: number[] = [];
 		const images: V3[] = [S];
+		/** el camino por los planos de `chain` (vacío: el directo) */
 		const tryChain = () => {
 			// de atrás hacia delante: del oído a la última imagen, cortando cada plano
 			const k = chain.length;
 			const pts: V3[] = new Array(k);
-			const triOf: number[] = new Array(k);
+			const inside: boolean[] = new Array(k);
+			const sides: number[] = new Array(k);
 			let target = ear;
+			const total = len(sub(ear, images[k]));
 			for (let j = k - 1; j >= 0; j--) {
 				const pl = planes[chain[j]];
 				const I = images[j + 1];
@@ -190,19 +189,69 @@ export function findPaths(tris: Float32Array, triMat: Int32Array, sources: { id:
 				const t = -(dot(pl.n, I) + pl.d) / den;
 				if (t <= 1e-6 || t >= 1 - 1e-6) return;
 				const X: V3 = [I[0] + t * dir[0], I[1] + t * dir[1], I[2] + t * dir[2]];
-				const tri = triAt(tris, pl, X);
-				if (tri < 0) return;
+				// el lado del plano por el que llega (el del punto siguiente, que está en el aire)
+				sides[j] = dot(pl.n, target) + pl.d > 0 ? 1 : -1;
+				inside[j] = triAt(tris, pl, X, sides[j], air) >= 0;
+				if (!inside[j]) {
+					if (!soft || k > softOrder) return;
+					// lejos del plano: ni por difracción (a más de dos zonas de Fresnel a 500 Hz de su superficie)
+					const s2 = len(sub(ear, X)); // aproximado: del rebote al oído en línea recta
+					if (boxDist(chain[j], X) > 2 * fresnelR(lam[B500 - FROM], Math.max(0.05, total - s2), Math.max(0.05, s2))) return;
+				}
 				pts[j] = X;
-				triOf[j] = tri;
 				target = X;
 			}
 			const all = [S, ...pts, ear];
-			for (let i = 0; i + 1 < all.length; i++) {
-				const pa = i > 0 ? chain[i - 1] : -1, pb = i < k ? chain[i] : -1;
-				if (grid.blocked(all[i], all[i + 1], (t) => triPlane[t] === pa || triPlane[t] === pb)) return;
+			const cum: number[] = [0];
+			for (let i = 0; i + 1 < all.length; i++) cum.push(cum[i] + len(sub(all[i + 1], all[i])));
+			const blockedSeg = all.slice(1).map((_, i) => bvh.blocked(all[i], all[i + 1], i > 0 ? chain[i - 1] : -1, i < k ? chain[i] : -1));
+			const geometric = inside.every(Boolean) && !blockedSeg.some(Boolean);
+			if (!geometric && k > softOrder) return;
+			const path: Path = {
+				src: s.id, order: k, length: total, points: all, mats: [], leave: unit(sub(all[1], S))
+			};
+			if (!soft) {
+				if (!geometric) return;
+				// el material del triángulo donde cae el rebote
+				path.mats = pts.map((X, j) => triMat[triAt(tris, planes[chain[j]], X)]);
+				out.push(path);
+				return;
 			}
-			out.push({ src: s.id, order: k, length: len(sub(ear, images[k])), points: all, mats: triOf.map((t) => triMat[t]), leave: unit(sub(pts[0], S)) });
+			// el material del triángulo donde cae el rebote (o del plano, si cae fuera)
+			path.mats = pts.map((X, j) => {
+				const t = triAt(tris, planes[chain[j]], X, sides[j], air);
+				return triMat[t >= 0 ? t : planes[chain[j]].tris[0]];
+			});
+			// nivel sin difracción respecto al directo: directividad, distancia y absorción
+			const gain = new Array<number>(NB).fill(0);
+			if (o.prune) {
+				const aim = o.prune.aim[s.id], dlen = len(sub(ear, S));
+				for (let b = 0; b < NB; b++) {
+					const f = HF_OCTAVES[FROM + b];
+					gain[b] = (aim ? khDirectivityDb(path.leave, aim, f) : 0) + 20 * Math.log10(dlen / total);
+					for (const m of path.mats) gain[b] += 10 * Math.log10(Math.max(1e-6, 1 - (o.prune.alpha[m]?.[FROM + b] ?? 0)));
+				}
+			}
+			const fres = new Array<number>(NB).fill(1);
+			if (!enough(gain, fres)) return;
+			for (let j = 0; j < k; j++) {
+				fz.coverage(chain[j], pts[j], unit(sub(pts[j], all[j])), cum[j + 1], total - cum[j + 1], fac);
+				for (let b = 0; b < NB; b++) fres[b] *= fac[b];
+				if (!enough(gain, fres)) return;
+			}
+			// primero los tramos tapados, que son los que más quitan
+			const segs = blockedSeg.map((_, i) => i).sort((x, y) => Number(blockedSeg[y]) - Number(blockedSeg[x]));
+			for (const i of segs) {
+				const dead = (v: number[]) => !enough(gain, fres.map((x, b) => x * Math.min(1, v[b])));
+				fz.visibility(all[i], all[i + 1], i > 0 ? chain[i - 1] : -1, i < k ? chain[i] : -1, cum[i], total, fac, dead);
+				for (let b = 0; b < NB; b++) fres[b] *= fac[b];
+				if (!enough(gain, fres)) return;
+			}
+			path.fres = [...new Array(FROM).fill(fres[0]), ...fres];
+			path.soft = !geometric;
+			out.push(path);
 		};
+		tryChain();
 		const rec = (order: number) => {
 			const list = order === 0 ? big1 : bigN;
 			const I = images[order];
@@ -292,6 +341,7 @@ export function octInterp(vals: number[], f: number): number {
  *  (apunta al oído, de pie). */
 export function pathAmplitude(p: Path, f: number, aim: V3, alpha: (mat: number) => number[]): number {
 	let a = Math.pow(10, (khDirectivityDb(p.leave, aim, f) - octInterp(AIR_DB_M, f) * p.length) / 20) / Math.max(0.05, p.length);
+	if (p.fres) a *= octInterp(p.fres, f);
 	for (const m of p.mats) a *= Math.sqrt(Math.max(0, 1 - octInterp(alpha(m), f)));
 	return a;
 }

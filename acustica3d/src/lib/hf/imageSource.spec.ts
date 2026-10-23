@@ -29,9 +29,17 @@ describe('medios y agudos (método de la imagen)', () => {
 		// tabla horizontal a 60 cm, debajo de todo el recorrido (como una mesa)
 		addBox(r, [1, 0.6, 0.5], [2.5, 0.62, 3], 'mesa');
 		const { tris, triMat } = geo(r);
-		const p = findPaths(tris, triMat, [{ id: 'k', pos: S }], E, { maxOrder: 1 });
+		const p = findPaths(tris, triMat, [{ id: 'k', pos: S }], E, { maxOrder: 1, diffraction: false });
 		expect(p.some((x) => x.order === 1 && Math.abs(x.points[1][1]) < 1e-6)).toBe(false); // suelo tapado
 		expect(p.some((x) => x.order === 1 && Math.abs(x.points[1][1] - 0.62) < 1e-6)).toBe(true); // rebote en la mesa
+		// con difracción el del suelo llega algo en medios (rodea los bordes de la mesa) y casi nada en agudos
+		const q = findPaths(tris, triMat, [{ id: 'k', pos: S }], E, { maxOrder: 1 });
+		const floor = q.find((x) => x.order === 1 && Math.abs(x.points[1][1]) < 1e-6);
+		if (floor) {
+			expect(floor.soft).toBe(true);
+			expect(floor.fres![8]).toBeLessThan(0.1);
+			expect(floor.fres![3]).toBeGreaterThan(floor.fres![8]);
+		}
 	});
 
 	it('la amplitud cae con la distancia, con la absorción y fuera del eje en agudos', () => {

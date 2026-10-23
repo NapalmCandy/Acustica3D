@@ -32,6 +32,7 @@ const SCREEN = /monitor ?pc|pantalla|screen|samsung|televis|\btv\b/i;
 const SCREEN_MAT = 'Pantalla del ordenador';
 const POROUS = /lana|rockwool|sonorock|absorb|fibra|panel|trampa|bass ?trap/i;
 const BOARD = /pladur|yeso|drywall|gypsum|placa|escayola/i;
+const DESK = /mesa|escritorio|desk/i;
 
 type Box = { lo: V3; hi: V3 };
 const emptyBox = (): Box => ({ lo: [Infinity, Infinity, Infinity], hi: [-Infinity, -Infinity, -Infinity] });
@@ -268,9 +269,17 @@ export function analyzeScene(tris: NamedTris, parts: SkpPart[], triPart: Int32Ar
 	let nTrap = 0, nPanel = 0;
 	const usedProducts = new Set<string>();
 	const absorberTris: number[][] = [];
+	// la lana que forma parte de una mesa (una franja absorbente sobre el tablero) se queda fija con ella
+	const inDesk = (q: number): boolean => q >= 0 && (DESK.test(parts[q].name) || inDesk(parts[q].parent));
+	let deskWool = 0;
 	for (let q = 0; q < parts.length; q++) {
 		const ts = partTris[q];
 		if (!ts.length || ts.some((t) => removed[t] || taken[t] || !isPorous(t))) continue;
+		if (inDesk(q)) {
+			deskWool++;
+			for (const t of ts) taken[t] = 1;
+			continue;
+		}
 		const par = parts[q].parent;
 		// solo el grupo más grande que siga siendo «un objeto de lana» (no la capa de una pared)
 		const yaw = yawOf(P, ts);
@@ -323,6 +332,7 @@ export function analyzeScene(tris: NamedTris, parts: SkpPart[], triPart: Int32Ar
 		const gap = Math.min(...[d, d.map((v) => -v) as V3].map((dd) => rayHit(P, solid, o.pos, dd, 0.5) - half));
 		if (Number.isFinite(gap) && gap > 0.01) o.porous!.airgap_mm = Math.round(gap * 1000);
 	}
+	if (deskWool) notes.push('La lana de la mesa se queda fija en su sitio, como parte de la mesa (no es un panel que se pueda mover).');
 	if (objects.length)
 		notes.push(
 			`${nTrap ? `${nTrap} trampas de esquina` : ''}${nTrap && nPanel ? ' y ' : ''}${nPanel ? `${nPanel} paneles` : ''} de lana pasan a ser objetos que se pueden mover (lista «Objetos»), con su grosor y su cámara de aire. ` +

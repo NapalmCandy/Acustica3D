@@ -54,6 +54,6 @@ Todo se calcula en tu PC, con el procesador o con la tarjeta gráfica. Con esos 
 
 ## Limitaciones
 
-- Los graves se calculan con ondas (hasta 500 Hz); los medios y agudos, con reflexiones como espejos (sin difusión ni difracción) y una directividad estimada de los KH.
+- Los graves se calculan con ondas (hasta 500 Hz); los medios y agudos, con reflexiones (método de la imagen) más una difracción aproximada por zonas de Fresnel, con la directividad del KH 120 medida por Neumann. Sin difusión por rugosidad ni la forma de la cabeza.
 - Los materiales usan valores típicos. Con medidas reales del micrófono (REW) se podrán ajustar a tu sala.
 - Las puntuaciones sirven para **comparar** sitios entre sí, no como nota absoluta.

@@ -47,6 +47,10 @@ function drawnRoom() {
 	box(group('cuerpo', silla), [1.8, 0.5, -2.9], [2.2, 1.3, -2.6], 'Oyente');
 	box(group('ojos', silla), [1.95, 1.2, -2.95], [2.05, 1.22, -2.9], 'eyeBall');
 	box(group('asiento', silla), [1.7, 0, -2.9], [2.3, 0.5, -2.4], '[Color_007]');
+	// mesa con una franja de lana encima (parte de la mesa: se queda fija)
+	const mesa = group('Mesa acustica');
+	box(group('Tablero', mesa), [1.2, 0.7, -3.9], [2.8, 0.73, -3.1], 'Madera DM');
+	box(group('Absorbente de la mesa', mesa), [1.25, 0.73, -3.6], [2.75, 0.78, -3.3], 'Lana Roca 80kg_m3');
 	// trampa en diagonal en una esquina y un panel plano con 5 cm de cámara
 	obj(group('Grupo#259'), { id: 't', name: 't', libId: '', size: [0.55, 1.3, 0.13], pos: [3.8, 0.65, -0.2], rotY: 45 }, 'Lana de roca 80kg/m3');
 	obj(group('Trampa'), { id: 'p', name: 'p', libId: '', size: [1, 0.6, 0.1], pos: [0.1, 1.2, -3], rotY: 90 }, 'Lana de roca 80kg/m3');
@@ -83,6 +87,12 @@ describe('lo dibujado en el .skp', () => {
 		expect(panel.porous!.airgap_mm).toBeCloseTo(50, -1);
 		expect(panel.porous!.density_kgm3).toBe(80);
 		expect(s.tris.materials).not.toContain('Lana de roca 80kg/m3');
+	});
+
+	it('la lana de una mesa se queda fija con ella (no pasa a ser un panel que se mueve)', () => {
+		expect(s.objects.some((o) => o.pos[1] < 0.8 && o.pos[2] < -3.2 && o.pos[2] > -3.7)).toBe(false);
+		expect(s.tris.materials).toContain('Lana Roca 80kg_m3');
+		expect(s.notes.some((n) => n.includes('lana de la mesa'))).toBe(true);
 	});
 
 	it('los objetos guardan la forma dibujada y, sin moverlos, quedan exactamente donde estaban', () => {
