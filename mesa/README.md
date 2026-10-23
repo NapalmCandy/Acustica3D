@@ -1,12 +1,13 @@
 # Mesas acústicas para el Estudio v0.05
 
-Dos diseños de mesa para los KH 120 A, calculados con la pestaña «Medios y agudos» de Acustica3D (método de la imagen con difracción por zonas de Fresnel y la directividad del KH 120 medida por Neumann) sobre el modelo `Estudio_v0.05.skp`.
+Diseños de mesa para los KH 120 A, calculados con la pestaña «Medios y agudos» de Acustica3D (método de la imagen con difracción por zonas de Fresnel y la directividad del KH 120 medida por Neumann) sobre el modelo `Estudio_v0.05.skp`.
 
 | | Archivo para SketchUp | Lámina |
 |---|---|---|
 | **Con lana** en el tablero | [`Mesa_con_lana.dae`](Mesa_con_lana.dae) | [`Mesa_con_lana.png`](Mesa_con_lana.png) |
 | **Sin lana**, con sitio para teclado, teclado MIDI y torre | [`Mesa_sin_lana.dae`](Mesa_sin_lana.dae) | [`Mesa_sin_lana.png`](Mesa_sin_lana.png) |
 | **Tres cuerpos mejorada**: tu idea de cuerpos que se meten uno dentro de otro, con ruedas y los KH sobre la mesa | [`Mesa_tres_cuerpos.dae`](Mesa_tres_cuerpos.dae) | [`Mapa_tres_cuerpos.png`](Mapa_tres_cuerpos.png) |
+| **Mesa útil con diseño**: instrumentos a mano, bandeja debajo, pantalla a la altura de los ojos (oído a 1,10 m) | [`Mesa_util_diseno.dae`](Mesa_util_diseno.dae) | [`Mesa_util_negro.png`](Mesa_util_negro.png) · [`Alzado_mesa_util.png`](Alzado_mesa_util.png) |
 
 Y el **mapa de zonas sensibles** con tu diseño original encima: [`Mapa_zonas_sensibles.png`](Mapa_zonas_sensibles.png).
 
@@ -113,35 +114,102 @@ Es la misma idea: tres cuerpos con ruedas que se meten uno dentro de otro, los K
 - Cada cuerpo de un color, o los tres iguales con el canto de otro color. Escalonados, los tres niveles ya llaman la atención por sí solos.
 - Un zócalo de 7 cm puede tapar las ruedas: acústicamente da igual, está a ras de suelo.
 
-## Mesa útil (en marcha)
+## Mesa útil con diseño
 
-La mesa de tres cuerpos mejorada deja la balda de instrumentos lejos, donde no se alcanza. Aquí va lo útil primero:
-- los instrumentos (teclado MIDI, pad, mesa de DJ) a mano, en una balda a 75 cm;
-- la bandeja del teclado y el ratón debajo, a 66 cm, con 7 cm de hueco hasta la balda;
-- los KH a la altura del oído medido, **1,10 m**, sin inclinarlos (el timbre no cambia al moverte con la silla);
-- la pantalla entre los KH y detrás, con su centro a la altura de los ojos.
+![Mesa útil, acabado negro](Mesa_util_negro.png)
 
-Archivo: [`Mesa_util.dae`](Mesa_util.dae). Los tres cuerpos con ruedas no son imprescindibles.
+Lo útil primero, y luego la estética (estudio moderno, casi futurista, que parezca caro sin serlo):
 
-**Ideas probadas** para la balda de instrumentos, que está justo donde rebota el sonido. Media de seis posiciones de cabeza, con el oído centrado a 1,10 m:
+- **Instrumentos a mano:** balda de 181 × 40 cm a **76 cm** (teclado MIDI, pad o mesa de DJ pequeña).
+- **Teclado y ratón debajo:** bandeja de nogal de 175 × 32 cm a **65 cm**, sobre guías. Entra entera bajo la balda: lo más bajo de la balda está a 72,6 cm, así que quedan **7,6 cm** libres. Por debajo de la bandeja quedan 63 cm para las piernas.
+- **KH a la altura del oído medido (1,10 m) y sin inclinar.** Apoyan en un puente a 94 cm, con el frontal al ras del canto. El timbre no cambia al moverte con la silla.
+- **Pantalla con el centro a 1,10 m, la altura de los ojos.** El puente tiene un recorte detrás en el centro (88 × 27 cm) y la pantalla baja por él hasta 90 cm. Va colgada de una aleta con una placa VESA fija, sin brazo: no sobresale y no se puede tirar.
+- **Todo en una pieza:** dos laterales «en ala» de DM doble (38 mm) unen los tres niveles. Son los que dan la silueta: suben en curva desde la balda hasta el puente y bajan en diagonal hasta el suelo. No son baldas sueltas.
+- **Sin ruedas:** pesa, no vuelca y los KH quedan encima de la mesa, lejos de las niñas y los gatos.
+
+| | |
+|---|---|
+| Archivo para SketchUp | [`Mesa_util_diseno.dae`](Mesa_util_diseno.dae) (y la versión sin acabados, [`Mesa_util.dae`](Mesa_util.dae)) |
+| Alzado acotado | [`Alzado_mesa_util.png`](Alzado_mesa_util.png) |
+| Vistas | [lateral](Mesa_util_negro_lateral.png) · [frente](Mesa_util_negro_frente.png) · [blanco y roble](Mesa_util_blanco.png) · [negro y naranja](Mesa_util_naranja.png) |
+| Mapa de zonas sensibles | [`Mapa_mesa_util.png`](Mapa_mesa_util.png) |
+
+![Alzado lateral acotado](Alzado_mesa_util.png)
+
+### La balda de instrumentos: retícula sobre lana
+
+La balda está justo donde rebota el sonido de los KH camino del oído, así que no puede ser un tablero liso. Lleva una ventana de 152 × 28 cm con tres capas:
+
+1. **Fondo:** un tablero de DM de 3 mm que sujeta la lana desde abajo.
+2. **Lana de roca de 80 kg/m³**, de 3 cm, a ras de la balda.
+3. **Retícula de listones de contrachapado** de 6 mm × 19 mm, cada 60 mm y a media madera (81 % abierta), con los huecos llenos de lana. Es la que aguanta el peso de los instrumentos, no la lana.
+
+Encima, toda la balda va forrada de tela acústica fina, de una pieza.
+
+No lleva chapa: vibra con el sonido. Tampoco lleva DM taladrado, que refleja de 1 kHz para arriba (ver la tabla de ideas).
+
+### Estética
+
+- **Acabado:** DM lacado negro mate, con nogal en la bandeja, en los paneles embutidos de los laterales y en los listones verticales del frente del puente.
+  - Los listones son de 2 cm, con 1,5 cm de hueco, sobre tela negra.
+  - Este frente queda por debajo del KH y no interviene en el sonido.
+- **Luz:** tiras LED con difusor (blanco frío en el acabado negro, cálido en el blanco, naranja en el negro y naranja). Van en estos sitios:
+  - en una ranura de 6 mm que sigue la curva delantera de cada lateral;
+  - bajo el canto de la balda, que ilumina la bandeja;
+  - bajo el puente;
+  - en el zócalo, contra el suelo, para que la mesa «flote»;
+  - detrás de la aleta: luz en la pared, detrás de la pantalla.
+- **Otras paletas:** [blanco y roble](Mesa_util_blanco.png) o [negro y naranja](Mesa_util_naranja.png).
+
+| Negro y nogal (frente) | Lateral |
+|---|---|
+| ![](Mesa_util_negro_frente.png) | ![](Mesa_util_negro_lateral.png) |
+
+### Resultado (oído a 1,10 m)
+
+![Desviación de cada opción](Grafica_desviacion.png)
+
+| Opción | Desviación | Energía en los primeros 20 ms |
+|---|---|---|
+| Sin mesa (solo la sala y la pantalla) | 1,88 dB (1,73–2,05) | −11,3 dB |
+| Tu mesa de tres cuerpos | 2,59 dB (2,25–3,17) | −7,8 dB |
+| Mesa nueva con la balda toda de madera | 1,76 dB (1,51–2,13) | −8,5 dB |
+| **Mesa nueva** (retícula sobre lana, pantalla a 1,10 m) | **1,67 dB** (1,47–1,97) | −8,8 dB |
+| Mesa nueva + teclado MIDI encima | 1,70 dB (1,49–1,99) | −7,9 dB |
+| Mesa nueva + pad a un lado | 1,65 dB (1,46–1,98) | −8,7 dB |
+
+- **Pantalla a 1,10 m:** bajarla por el recorte del puente no cambia el sonido. Sin el recorte, con la pantalla 6 cm más alta, la mesa dio lo mismo (1,67 dB). En cambio, un puente escalonado (los KH arriba y la pantalla en un tablero más bajo) empeora a 2,00 dB, porque añade otro canto entre los KH y el oído.
+- **Con instrumentos encima, igual:** un teclado MIDI o un pad apenas cambian el resultado.
+- **Lo que queda es de la sala y del propio puente.** El KH apoyado con el frontal al ras deja un rebote muy corto en el canto (0,09 ms, −14 dB). Es el que hace el valle de 5–6 kHz de la respuesta, por encima de la zona que se mide.
+
+![Respuesta en el oído](Grafica_respuesta.png)
+
+![Reflexiones que llegan al oído](Grafica_reflexiones.png)
+
+### Ideas probadas para la balda
+
+Media de seis posiciones de la cabeza, con el oído centrado a 1,10 m. Es la primera versión de la mesa útil, con la sala sin pantalla colgada; compáralas entre sí, no con la tabla de arriba.
 
 | Opción | Desviación |
 |---|---|
 | Sin mesa (solo la sala) | 1,78 dB |
 | Balda de madera, vacía | 2,18 dB |
-| **Balda con una ventana de lana de roca de 152 × 28 cm, a ras, donde rebota el sonido** | **1,60 dB** |
-| Lo mismo, con el teclado MIDI encima de la lana (de forma provisional) | 1,59 dB |
-| Ventana de lana con rejilla metálica encima (chapa de 1,5 mm, agujeros de 10 mm, 40 % abierta) | 1,67 dB |
-| DM de 19 mm taladrado, sin nada debajo (agujeros de 6–12 mm cada 16–25 mm) | 1,92–2,14 dB |
+| Ventana de lana de roca de 152 × 28 cm, a ras, sin nada encima | 1,52–1,60 dB |
+| **Retícula de listones de madera sobre lana (80 % abierta), la elegida** | **1,65 dB** |
+| Ventana de lana con rejilla metálica encima (descartada: la chapa vibra) | 1,67 dB |
+| Agujeros de corona de 35–68 mm sobre lana (68 mm al tresbolillo, 66 % abierta: 1,74) | 1,74–1,83 dB |
 | DM de 19 mm taladrado sobre lana | 1,91 dB |
+| DM de 19 mm taladrado, sin nada debajo (agujeros de 6–12 mm cada 16–25 mm) | 1,92–2,14 dB |
 | Balda inclinada 15° con ventana de lana | 1,90 dB |
 | Difusor QRD de 10 cm en la ventana (estimado; no se puede apoyar nada) | ≈ 1,8 dB |
-| La mesa con lana de arriba (sin instrumentos a mano) | 1,37 dB |
+| Difusor de taladros ciegos | 2,10 dB |
+| Bajar los KH | 2,3–2,5 dB |
 
-- **La ventana de lana** deja la mesa acústicamente como si no estuviera: 1,60 dB, frente a 1,78 dB sin mesa. Con un instrumento encima de forma provisional, igual. Mejor con tela fina; con rejilla metálica fina, casi igual y más resistente.
-- **El DM taladrado no sirve.** Con 19 mm de grosor cada agujero es un tubo de aire con masa: deja pasar los graves, que aquí no importan, y refleja de 1 kHz para arriba, que es justo lo que molesta. Solo funciona muy fino y muy abierto, y eso ya es una rejilla.
-- **Los difusores tampoco.** Para actuar a 500 Hz–2 kHz necesitan 10 cm de fondo o más. Uno de taladros ciegos de 3 cm solo trabaja por encima de 2–4 kHz.
-- **Lo que queda ya es de la sala:** el rebote en el suelo, el techo y las paredes. Para bajar de ahí ayuda que la mesa tape el suelo sin reflejar, como hace la mesa con lana.
+- **La lana deja la balda acústicamente como si no estuviera.** La retícula de madera es lo más abierto que aguanta peso.
+- **El DM taladrado no sirve.** Con 19 mm de grosor, cada agujero es un tubo de aire con masa: deja pasar los graves, que aquí no importan, y refleja de 1 kHz para arriba, que es justo lo que molesta.
+- **Las coronas grandes** se acercan a la retícula: cuanto más abiertas, mejor.
+- **Los difusores** necesitan 10 cm de fondo o más para actuar entre 500 Hz y 2 kHz.
+- Diferencias de menos de 0,2 dB no se oyen.
 
 ## Cómo meterla en tu modelo
 
