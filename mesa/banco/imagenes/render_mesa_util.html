@@ -1,0 +1,107 @@
+<!doctype html><meta charset="utf-8">
+<style>html,body{margin:0;background:#111}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./three/build/three.module.js","three/addons/":"./three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
+RectAreaLightUniformsLib.init();
+const P = new URLSearchParams(location.search);
+const VIEW = P.get('v') ?? '1', PAL = P.get('p') ?? 'negro';
+const W = 1600, H = 1000;
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+r.setSize(W, H); r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.05; r.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(r.domElement);
+const scene = new THREE.Scene();
+// paletas: cuerpo, tela, bandeja, zócalo, LED, acento
+const PALS = {
+	negro: { body: 0x17171a, fabric: 0x2b2e34, tray: 0x6b4428, plinth: 0x09090a, led: 0xbfe4ff, accent: 0x17171a, wall: 0xdedad3, floor: 0xbdb7ad, bg: 0x2a2a2c },
+	blanco: { body: 0xeceae6, fabric: 0x8d9096, tray: 0xb8895a, plinth: 0x2a2a2c, led: 0xffd9a8, accent: 0xeceae6, wall: 0xe6e2da, floor: 0xc9c2b6, bg: 0x2e2d2b },
+	naranja: { body: 0x26272b, fabric: 0x34363c, tray: 0x2f3034, plinth: 0x0c0c0d, led: 0xff7a2e, accent: 0xff6a1a, wall: 0xd9d5ce, floor: 0xb3ada3, bg: 0x2a2a2c }
+};
+const C = PALS[PAL];
+scene.background = new THREE.Color(C.bg);
+const std = (color, rough = 0.55, metal = 0.03, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, ...extra });
+const MAT = {
+	negro: std(C.body, 0.5), tela: std(C.fabric, 1, 0, { transparent: true, opacity: 0.82 }), nogal: std(C.tray, 0.45), reticula: std(PAL === 'blanco' ? 0xc9b48a : 0x3c3d42, 0.7),
+	zocalo: std(C.plinth, 0.8), metal: std(0x3a3a3d, 0.4, 0.6), led: new THREE.MeshBasicMaterial({ color: C.led })
+};
+// sala: suelo y paredes (frontal en Y 6,656 de SketchUp, lateral izquierda en X 0)
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 10), std(C.floor, 0.85));
+floor.rotation.x = -Math.PI / 2; floor.position.set(2, 0, -4); floor.receiveShadow = true; scene.add(floor);
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(8, 3), std(C.wall, 0.9)); wall.position.set(2, 1.5, -6.656); wall.receiveShadow = true; scene.add(wall);
+const wallL = new THREE.Mesh(new THREE.PlaneGeometry(10, 3), std(C.wall, 0.9)); wallL.rotation.y = Math.PI / 2; wallL.position.set(0, 1.5, -4); wallL.receiveShadow = true; scene.add(wallL);
+// la mesa (coordenadas de SketchUp: x, z arriba, y hacia la pared → three: x, y, −z)
+const parts = await (await fetch('mesa.json')).json();
+for (const p of parts) {
+	const a = new Float32Array(p.tris.length);
+	for (let i = 0; i < p.tris.length; i += 3) { a[i] = p.tris[i]; a[i + 1] = p.tris[i + 2]; a[i + 2] = -p.tris[i + 1]; }
+	const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(a, 3)); g.computeVertexNormals();
+	let m = MAT[p.finish] ?? MAT.negro;
+	if (PAL === 'naranja' && /marco delantero/.test(p.name)) m = std(C.accent, 0.4);
+	const mesh = new THREE.Mesh(g, m); mesh.castShadow = p.finish !== 'led'; mesh.receiveShadow = true; scene.add(mesh);
+}
+const add = (geo, mat, x, y, z, ry = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = m.receiveShadow = true; scene.add(m); return m; };
+// KH 120 A: 182 × 277 × 229 mm, apuntando al oído (X 2,06, Y 4,167)
+for (const x of [1.376, 2.743]) {
+	const grp = new THREE.Group(); grp.position.set(x, 0.945, -5.673);
+	grp.rotation.y = Math.atan2(2.06 - x, 5.673 - 4.167);
+	const box = new THREE.Mesh(new THREE.BoxGeometry(0.182, 0.277, 0.229), std(0x2c2d30, 0.6)); box.position.y = 0.1385; box.castShadow = true; grp.add(box);
+	const ring = (rad, y, col) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, 0.01, 40), std(col, 0.5, 0.2)); c.rotation.x = Math.PI / 2; c.position.set(0, y, 0.1155); grp.add(c); };
+	ring(0.068, 0.095, 0x1a1a1b); ring(0.045, 0.095, 0x3a3a3c); ring(0.042, 0.215, 0x1c1c1d); ring(0.012, 0.215, 0x777779);
+	const logo = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.006, 0.004), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x88ccff, emissiveIntensity: 1 })); logo.position.set(0, 0.025, 0.1165); grp.add(logo);
+	scene.add(grp);
+}
+// pantalla curva de 34" (1000R) colgada de la aleta: borde de abajo a 0,95 m
+{
+	const th = 0.82, R = 1.0;
+	const geo = new THREE.CylinderGeometry(R, R, 0.36, 48, 1, true, Math.PI - th / 2, th);
+	const scr = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x0a1020, emissive: 0x1b3a6a, emissiveIntensity: 0.6, side: THREE.DoubleSide, roughness: 0.2 }));
+	scr.position.set(2.06, 1.1, -5.80 + R); scene.add(scr);
+	const back = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.02, R + 0.02, 0.4, 48, 1, true, Math.PI - th / 2 - 0.01, th + 0.02), std(0x111113, 0.5, 0.1, { side: THREE.DoubleSide }));
+	back.position.copy(scr.position); scene.add(back);
+	const glow = new THREE.RectAreaLight(0x5d8cff, 1.2, 0.8, 0.36); glow.position.set(2.06, 1.1, -5.76); glow.lookAt(2.06, 1.15, -4); scene.add(glow);
+}
+// teclado MIDI de 61 teclas en la balda, pad a la derecha, teclado y ratón en la bandeja
+{
+	const kb = add(new THREE.BoxGeometry(0.95, 0.06, 0.28), std(0x141416, 0.5), 2.06, 0.79, -4.81);
+	add(new THREE.BoxGeometry(0.86, 0.02, 0.15), std(0xf2f2ee, 0.35), 2.06, 0.83, -4.735);
+	for (let i = 0; i < 36; i++) { const n = i % 7; if (n === 2 || n === 6) continue; add(new THREE.BoxGeometry(0.012, 0.014, 0.09), std(0x0c0c0d, 0.4), 2.06 - 0.43 + (i + 1) * 0.0239, 0.845, -4.765); }
+	for (let i = 0; i < 8; i++) add(new THREE.CylinderGeometry(0.008, 0.008, 0.012, 16), std(0x888888, 0.3, 0.5), 1.72 + i * 0.03, 0.825, -4.92);
+	add(new THREE.BoxGeometry(0.26, 0.035, 0.26), std(0x151517, 0.5), 2.74, 0.7775, -4.83);
+	for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) add(new THREE.BoxGeometry(0.05, 0.01, 0.05), new THREE.MeshStandardMaterial({ color: 0x2b2b2e, emissive: (i + j) % 3 ? C.led : 0xff4d6d, emissiveIntensity: 0.35 }), 2.74 - 0.09 + i * 0.06, 0.8, -4.92 + j * 0.06);
+	add(new THREE.BoxGeometry(0.44, 0.025, 0.14), std(0x2a2a2d, 0.5), 2.0, 0.6625, -4.53);
+	add(new THREE.BoxGeometry(0.065, 0.035, 0.11), std(0x2a2a2d, 0.4), 2.36, 0.6675, -4.53);
+}
+// LED: tiras como luces de área (además del material que brilla)
+const strip = (x, y, z, w, h, look, i = 2.5) => { const l = new THREE.RectAreaLight(C.led, i, w, h); l.position.set(x, y, z); l.lookAt(...look); scene.add(l); };
+strip(2.055, 0.733, -4.677, 1.7, 0.03, [2.055, 0, -4.6], 14);
+strip(2.055, 0.913, -5.52, 1.7, 0.03, [2.055, 0, -5.45], 10);
+strip(2.055, 0.015, -5.52, 1.7, 0.03, [2.055, 0.01, -3], 8);
+strip(2.06, 1.12, -5.96, 0.36, 0.3, [2.06, 1.12, -7], 22);
+// luz general: suave, de estudio
+scene.add(new THREE.HemisphereLight(0xffffff, 0x505050, PAL === 'blanco' ? 0.8 : 0.6));
+const fill = new THREE.DirectionalLight(0xdfe8ff, 0.7); fill.position.set(4, 2.5, -2.5); fill.target.position.set(2, 0.7, -5); scene.add(fill, fill.target);
+const rim = new THREE.SpotLight(0xffffff, 6, 6, 0.6, 0.6); rim.position.set(2.06, 2.6, -6.4); rim.target.position.set(2.06, 0.8, -5.2); scene.add(rim, rim.target);
+const key = new THREE.DirectionalLight(0xfff4e8, 1.5); key.position.set(-1, 4, -2); key.target.position.set(2, 0.6, -5); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048); Object.assign(key.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3, near: 0.5, far: 12 }); scene.add(key, key.target);
+const VIEWS = {
+	'1': [[0.55, 1.6, -3.35], [2.0, 0.8, -5.2], 42],
+	'2': [[4.0, 1.05, -4.75], [2.0, 0.65, -5.15], 40],
+	'3': [[2.95, 1.25, -4.05], [2.05, 0.68, -4.95], 45],
+	'4': [[2.06, 1.3, -3.45], [2.06, 0.85, -5.3], 40]
+};
+let cam;
+if (VIEW === '2') {
+	// alzado lateral, desde la derecha, sin paredes
+	wall.visible = false; wallL.visible = false;
+	scene.background = new THREE.Color(PAL === 'blanco' ? 0x3a3936 : 0x2f3034);
+	const h = 0.85, w = h * (W / H);
+	cam = new THREE.OrthographicCamera(-w, w, h, -h, 0.1, 20); cam.position.set(7, 0.72, -5.05); cam.lookAt(0, 0.72, -5.05);
+} else {
+	const [pos, tgt, fov] = VIEWS[VIEW];
+	cam = new THREE.PerspectiveCamera(fov, W / H, 0.05, 30); cam.position.set(...pos); cam.lookAt(...tgt);
+}
+r.render(scene, cam);
+window.__done = true;
+</script>

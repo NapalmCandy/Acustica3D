@@ -1,0 +1,11 @@
+import { chromium } from '/home/user/acustica3d/acustica3d/node_modules/playwright/index.mjs';
+const [URL, FILE] = process.argv.slice(2);
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const p = await b.newPage({ viewport: { width: 1600, height: 1000 } });
+p.on('pageerror', (e) => console.log('pageerror', e.message));
+p.on('console', (m) => { if (m.type() === 'error') console.log('console', m.text()); });
+await p.goto(URL);
+await p.setInputFiles('#model-file', FILE);
+await p.waitForSelector('text=/^Nivel 2\\//', { timeout: 300000 });
+console.log('arranca y llega al nivel 2; notas plegadas:', await p.locator('details summary', { hasText: 'Qué se ha reconocido' }).count());
+await b.close();

@@ -230,6 +230,119 @@ function mesaUtilDiseno(G) {
 	G('LED aleta', 'Metal pie KH', 'led', box([1.88, 5.95, 0.95], [2.24, 5.955, 1.28]));
 }
 
+// ── Mesa «Arco» ──────────────────────────────────────────────────────────────────────────────────────────
+// Triángulo de 60° del análisis (graves con el sub + medios y agudos): oído en (2,05, 4,19) a 1,10 m, KH a 1,40 m
+// (frontal en el radio 1,40), girados 30° hacia el oído. Todo lo que está delante es un arco centrado en el oído.
+export const ARCO = { xc: 2.05, ye: 4.19, ear: 1.1, D: 1.4, half: 0.96, sub: [2.85, 5.14] };
+const arcPt = (r, aDeg, A = ARCO) => { const a = (aDeg * Math.PI) / 180; return [A.xc + r * Math.sin(a), A.ye + r * Math.cos(a)]; };
+/** sólido de 8 vértices (orden de `box`) entre dos polígonos de 4 vértices en planta, con alturas por vértice */
+const slab = (q, zlo, zhi) => [...q.map(([x, y], i) => [x, y, typeof zlo === 'function' ? zlo(x, y) : zlo]), ...q.map(([x, y]) => [x, y, typeof zhi === 'function' ? zhi(x, y) : zhi])];
+/** sector de corona (r0..r1, a0..a1) en trozos */
+const sectorSolids = (r0, r1, a0, a1, zlo, zhi, step = 3) => {
+	const n = Math.max(1, Math.ceil((a1 - a0) / step)), out = [];
+	for (let i = 0; i < n; i++) {
+		const aa = a0 + ((a1 - a0) * i) / n, ab = a0 + ((a1 - a0) * (i + 1)) / n;
+		out.push(slab([arcPt(r0, aa), arcPt(r0, ab), arcPt(r1, ab), arcPt(r1, aa)], zlo, zhi));
+	}
+	return out;
+};
+/** franja entre el arco r (delante) y la recta y = yb (detrás), de x0 a x1 */
+const arcLine = (r, yb, x0, x1, zlo, zhi, dx = 0.03) => {
+	const A = ARCO, yf = (x) => A.ye + Math.sqrt(Math.max(0, r * r - (x - A.xc) ** 2)), n = Math.ceil((x1 - x0) / dx), out = [];
+	for (let i = 0; i < n; i++) {
+		const xa = x0 + ((x1 - x0) * i) / n, xb = x0 + ((x1 - x0) * (i + 1)) / n;
+		out.push(slab([[xa, yf(xa)], [xb, yf(xb)], [xb, yb], [xa, yb]], zlo, zhi));
+	}
+	return out;
+};
+/** la balda: sube 8° hacia los KH (las cosas se inclinan hacia ti y su rebote va al pecho) */
+export function arcoShelf(A = ARCO) {
+	const c = Math.max(0.62, A.D / 2), w0 = c - 0.21, w1 = Math.min(c + 0.2, A.D - 0.3);
+	return { y: 0.77, r0: w0 - 0.03, r1: w1 + 0.02, a: 52, tilt: 8, w0, w1, wa: 49, c: (w0 - 0.03 + w1 + 0.02) / 2 };
+}
+export function arcoWing(A = ARCO) {
+	const S = arcoShelf(A), tk = Math.tan((S.tilt * Math.PI) / 180), zs = (r) => S.y + (r - S.c) * tk;
+	const yB = A.ye + A.D * Math.cos(Math.PI / 6) + 0.43, top = A.ear - 0.17; // fondo: caja del KH (23 cm) y 20 cm para el pie de la pantalla
+	const yBr = A.ye + Math.sqrt((A.D - 0.03) ** 2 - A.half ** 2); // canto del puente en el lateral
+	const yS0 = A.ye + S.r0 * Math.cos((S.a * Math.PI) / 180), yS1 = A.ye + S.r1 * Math.cos((S.a * Math.PI) / 180);
+	const zS0 = zs(S.r0), zS1 = zs(S.r1);
+	// ala: banda de 12–14 cm que sigue el contorno de arriba (puente → curva → balda → morro), con un poste detrás
+	const curve = ease(0, 1, 9).map((t) => [yBr - t * (yBr - yS1 - 0.02), top - t * (top - zS1)]);
+	const off = 0.12; // ancho de la banda (constante)
+	const topPath = [[yBr, top], ...curve, [yS1, zS1], [yS0 + 0.03, zS0 + 0.03 * Math.tan((S.tilt * Math.PI) / 180)]];
+	const prof = [[yB, 0.15], [yB, top], ...topPath, [yS0, zS0], [yS0 - 0.025, zS0 - 0.012], [yS0 - 0.03, zS0 - 0.035], [yS0 - 0.015, zS0 - off + 0.01]];
+	for (let i = topPath.length - 1; i >= 0; i--) { const [y, z] = topPath[i]; prof.push([i === 0 ? yB - 0.1 : y + 0.005 * i, z - off]); }
+	prof.push([yB - 0.1, 0.15]);
+	// pata inclinada: de debajo del morro de la balda al suelo, hacia atrás (deja libre el sitio de las piernas)
+	const leg = [[yS0 + 0.06, zS0 - 0.1], [yS0 + 0.17, zS0 - 0.1], [yB - 0.32, 0.15], [yB - 0.44, 0.15]];
+	return { prof, leg, yB, yBr, top, S, zs, yS0, yS1 };
+}
+function mesaArco(G, A = ARCO) {
+	const T = 0.025, W = arcoWing(A), { yB, top, S, zs } = W, xl = A.xc - A.half, xr = A.xc + A.half, rx = 0.42;
+	const rEdge = A.D - 0.03; // los KH sobresalen 3 cm del canto
+	// laterales «en ala» de 38 mm, flotando a 15 cm del suelo (pasa la Roomba) sobre un pie retranqueado
+	G('Lateral izquierdo (ala)', 'Madera DM', 'cuerpo', extrudeX(W.prof, xl - 0.038, xl));
+	G('Lateral derecho (ala)', 'Madera DM', 'cuerpo', extrudeX(W.prof, xr, xr + 0.038));
+	G('Lateral izquierdo (pata)', 'Madera DM', 'cuerpo', extrudeX(W.leg, xl - 0.038, xl));
+	G('Lateral derecho (pata)', 'Madera DM', 'cuerpo', extrudeX(W.leg, xr, xr + 0.038));
+	// pies retranqueados (negros): bajo el poste y bajo la pata; por lo demás, 15 cm libres hasta el suelo
+	for (const [n, x] of [['izquierdo', xl - 0.029], ['derecho', xr + 0.009]]) {
+		G(`Pie trasero ${n}`, 'Madera DM', 'pie', box([x, yB - 0.09, 0], [x + 0.02, yB - 0.01, 0.15]));
+		G(`Pie delantero ${n}`, 'Madera DM', 'pie', box([x, yB - 0.43, 0], [x + 0.02, yB - 0.33, 0.15]));
+	}
+	// puente de los KH (base a 93 cm: eje a 1,10 m), canto en arco; en el centro, el rebaje curvo de la pantalla con su pie
+	G('Puente - tablero izquierdo', 'Madera DM', 'cuerpo', ...arcLine(rEdge, yB, xl, A.xc - rx, top - T, top));
+	G('Puente - tablero derecho', 'Madera DM', 'cuerpo', ...arcLine(rEdge, yB, A.xc + rx, xr, top - T, top));
+	G('Pantalla - fondo del rebaje (pie a 78,5 cm)', 'Madera DM', 'cuerpo', ...arcLine(A.D + 0.05, yB, A.xc - rx, A.xc + rx, 0.76, 0.785));
+	for (const [n, x] of [['izquierdo', A.xc - rx], ['derecho', A.xc + rx - 0.02]]) G(`Pantalla - lado ${n} del rebaje`, 'Madera DM', 'roble', box([x, A.ye + Math.sqrt((A.D + 0.05) ** 2 - rx ** 2) - 0.01, 0.785], [x + 0.02, yB, top - T]));
+	G('Puente - trasera', 'Madera DM', 'cuerpo', box([xl, yB - 0.02, 0.15], [xr, yB, top - T]));
+	// tacos de los KH (los pies adhesivos del manual, 3 mm)
+	for (const s of [-1, 1]) {
+		const a = (s * 30 * Math.PI) / 180, [fx, fy] = arcPt(A.D, s * 30), f = [-Math.sin(a), -Math.cos(a)], rr = [-f[1], f[0]];
+		for (const [u, v] of [[-0.07, 0.03], [0.07, 0.03], [-0.07, 0.2], [0.07, 0.2]]) {
+			const cx = fx + u * rr[0] - v * f[0], cy = fy + u * rr[1] - v * f[1];
+			G(`Pie adhesivo KH ${s < 0 ? 'izquierdo' : 'derecho'}`, 'Metal pie KH', 'pie', box([cx - 0.012, cy - 0.012, top], [cx + 0.012, cy + 0.012, top + 0.003]));
+		}
+	}
+	// frente de listones de roble sobre tela negra, retranqueado 12 cm del canto (no hace de bafle)
+	const rS = rEdge + 0.12, lim = Math.asin((A.half - 0.05) / rS) * (180 / Math.PI);
+	G('Frente - tela', 'Lana Roca 80kg_m3', 'tela', ...sectorSolids(rS + 0.02, rS + 0.04, -lim, lim, 0.15, top - T, 1.5));
+	const sl = [];
+	for (let a = -lim; a < lim; a += (0.035 / rS) * (180 / Math.PI)) sl.push(...sectorSolids(rS, rS + 0.02, a, a + (0.02 / rS) * (180 / Math.PI), 0.15, top - T, 5));
+	G('Frente - listones', 'Madera DM', 'roble', ...sl);
+	// balda de instrumentos: corona de ±52°, inclinada 8° hacia ti; ventana de aletas de 3 mm cada 4 cm sobre lana
+	// de 3 cm (fondo de 3 mm), todo forrado de tela; brazos hasta los laterales
+	const zT = (x, y) => zs(Math.hypot(x - A.xc, y - A.ye));
+	const below = (d) => (x, y) => zT(x, y) - d;
+	G('Balda - marco', 'Madera DM', 'roble', ...sectorSolids(S.r0, S.w0, -S.a, S.a, below(T), zT), ...sectorSolids(S.w1, S.r1, -S.a, S.a, below(T), zT),
+		...sectorSolids(S.w0, S.w1, -S.a, -S.wa, below(T), zT), ...sectorSolids(S.w0, S.w1, S.wa, S.a, below(T), zT));
+	G('Balda - lana', 'Lana Roca 80kg_m3', 'tela', ...sectorSolids(S.w0, S.w1, -S.wa, S.wa, below(0.031), below(0.005)));
+	G('Balda - fondo de la ventana', 'Madera DM', 'cuerpo', ...sectorSolids(S.w0, S.w1, -S.wa, S.wa, below(0.034), below(0.031)));
+	const fins = [];
+	for (let r = S.w0 + 0.02; r + 0.003 < S.w1; r += 0.04) fins.push(...sectorSolids(r, r + 0.003, -S.wa, S.wa, below(0.031), zT));
+	G('Balda - aletas de contrachapado', 'Madera DM', 'aleta', ...fins);
+	G('Balda - tela acústica', 'Lana Roca 80kg_m3', 'telafina', ...sectorSolids(S.w0, S.w1, -S.wa, S.wa, zT, (x, y) => zT(x, y) + 0.001));
+	for (const s of [-1, 1]) {
+		const p0 = arcPt(S.r0, s * S.a), p1 = arcPt(S.r1, s * S.a), xw = s < 0 ? xl : xr;
+		const q = s < 0 ? [[xw, p0[1]], p0, p1, [xw, p1[1]]] : [p0, [xw, p0[1]], [xw, p1[1]], p1];
+		G(`Balda - brazo ${s < 0 ? 'izquierdo' : 'derecho'}`, 'Madera DM', 'cuerpo', slab(q, (x, y) => zs(S.r0 + ((y - p0[1]) / (p1[1] - p0[1])) * (S.r1 - S.r0)) - T, (x, y) => zs(S.r0 + ((y - p0[1]) / (p1[1] - p0[1])) * (S.r1 - S.r0))));
+	}
+	// bandeja de teclado y ratón a 65 cm (sale sobre guías; entra bajo la balda)
+	G('Bandeja teclado', 'Madera DM', 'roble', box([A.xc - 0.55, A.ye + 0.23, 0.63], [A.xc + 0.55, A.ye + 0.55, 0.65]));
+	for (const [n, x] of [['izquierda', A.xc - 0.57], ['derecha', A.xc + 0.55]]) G(`Bandeja - guía ${n}`, 'Madera DM', 'pie', box([x, A.ye + 0.45, 0.63], [x + 0.02, A.ye + 0.75, zs(S.r0) - 0.035]));
+	// luz: bajo el canto del puente y de la balda, bajo los laterales (en el suelo), detrás (pared) y en el rebaje
+	const ang = (x, r) => (Math.asin((x - A.xc) / r) * 180) / Math.PI;
+	const band = (r0, r1, x0, x1, zlo, zhi) => sectorSolids(r0, r1, ang(x0, r0), ang(x1, r0), zlo, zhi, 2);
+	G('Puente - canto de roble', 'Madera DM', 'roble', ...band(rEdge - 0.003, rEdge + 0.004, xl, A.xc - rx, top - T, top + 0.0005), ...band(rEdge - 0.003, rEdge + 0.004, A.xc + rx, xr, top - T, top + 0.0005));
+	G('LED puente', 'Metal pie KH', 'led', ...band(rEdge + 0.01, rEdge + 0.025, xl + 0.03, A.xc - rx - 0.02, top - T - 0.005, top - T), ...band(rEdge + 0.01, rEdge + 0.025, A.xc + rx + 0.02, xr - 0.03, top - T - 0.005, top - T));
+	G('LED balda', 'Metal pie KH', 'led', ...sectorSolids(S.r0 + 0.01, S.r0 + 0.025, -S.a + 2, S.a - 2, below(T + 0.005), below(T)));
+	G('LED bajo la mesa', 'Metal pie KH', 'led', box([xl + 0.05, yB - 0.06, 0.145], [xr - 0.05, yB - 0.04, 0.15]));
+	G('LED trasera', 'Metal pie KH', 'led', box([xl + 0.05, yB, top - 0.03], [xr - 0.05, yB + 0.005, top - 0.01]));
+	G('LED rebaje', 'Metal pie KH', 'led', box([A.xc - rx + 0.03, yB - 0.025, 0.79], [A.xc + rx - 0.03, yB - 0.02, 0.8]));
+	// el sub, donde lo pone el análisis (en el suelo; no es parte de la mesa)
+	G('Sub8 (posición del análisis)', 'Metal pie KH', 'sub', box([A.sub[0] - 0.15, A.sub[1] - 0.165, 0], [A.sub[0] + 0.15, A.sub[1] + 0.165, 0.3]));
+}
+
 /** las piezas de una mesa: { name, mat (material acústico), finish (acabado, para las imágenes), tris } */
 export function collect(build) {
 	const groups = [];
@@ -266,7 +379,7 @@ export function dae(build) {
 </COLLADA>`;
 }
 
-export { conLana, sinLana, tresCuerpos, mesaUtil, mesaUtilDiseno };
+export { conLana, sinLana, tresCuerpos, mesaUtil, mesaUtilDiseno, mesaArco };
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
 	writeFileSync(new URL('./Mesa_con_lana.dae', import.meta.url), dae(conLana));
@@ -274,5 +387,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
 	writeFileSync(new URL('./Mesa_tres_cuerpos.dae', import.meta.url), dae(tresCuerpos));
 	writeFileSync(new URL('./Mesa_util.dae', import.meta.url), dae(mesaUtil));
 	writeFileSync(new URL('./Mesa_util_diseno.dae', import.meta.url), dae(mesaUtilDiseno));
-	console.log('ok: mesa/Mesa_con_lana.dae, Mesa_sin_lana.dae, Mesa_tres_cuerpos.dae, Mesa_util.dae, Mesa_util_diseno.dae');
+	writeFileSync(new URL('./Mesa_arco.dae', import.meta.url), dae(mesaArco));
+	console.log('ok: mesa/Mesa_con_lana.dae, Mesa_sin_lana.dae, Mesa_tres_cuerpos.dae, Mesa_util.dae, Mesa_util_diseno.dae, Mesa_arco.dae');
 }

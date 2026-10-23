@@ -1,0 +1,109 @@
+import { it, expect } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { loadScene, alphaTable, assemble, evaluate, FREQS } from './hfeval';
+import { EXTRA, moveScreen } from './desk';
+import { prism } from './prism';
+// @ts-ignore (módulo JS del repositorio)
+import { collect, mesaUtil, mesaUtilDiseno } from '../../../mesa/gen_mesas.mjs';
+import type { V3 } from '../lib/sim/voxel';
+const PL = 'Plástico duro';
+EXTRA[PL] = [0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.02, 0.02];
+EXTRA['Metal pie KH'] = [0.01, 0.01, 0.01, 0.02, 0.02, 0.02, 0.02, 0.02];
+import { porousSurfaceImpedance, randomIncidenceAlpha, OCTAVES, LIBRARY, materialAlpha } from '../lib/acoustics/materials';
+/** tablero de DM de grosor t con agujeros de diámetro d (parte abierta σ) y lana de roca de 80 kg/m³ detrás
+ *  (y dentro): en medios, masa del aire de los agujeros con la corrección de Fok (con muchos agujeros
+ *  juntos cada uno añade menos masa); en agudos, cuando el agujero es grande frente a la longitud de onda,
+ *  la lana solo absorbe por los agujeros y la madera entre ellos refleja */
+function holedAlpha(d: number, t: number, sig: number, woolMm: number): number[] {
+	const rho = 1.204, c0 = 343, eta = 1.8e-5;
+	const wool = materialAlpha({ ...LIBRARY.find((l) => l.id === 'panel_lana_roca')!, porous: { thickness_mm: woolMm, density_kgm3: 80, airgap_mm: 0 } });
+	return OCTAVES.map((f, i) => {
+		const w = 2 * Math.PI * f;
+		const z = porousSurfaceImpedance(f, { thickness_mm: woolMm, density_kgm3: 80, airgap_mm: 0 });
+		const kk = (d / 2) * Math.sqrt((w * rho) / eta);
+		const r = ((8 * eta * t) / (sig * rho * c0 * (d / 2) ** 2)) * Math.sqrt(1 + kk * kk / 32);
+		const fok = Math.max(0.05, 1 - 1.47 * Math.sqrt(sig) + 0.47 * sig ** 1.5);
+		const x = (w * (t + 0.85 * d * fok)) / (sig * c0);
+		const lumped = randomIncidenceAlpha({ re: z.re + r, im: z.im + x });
+		const geo = sig * wool[i];
+		const kd = (w / c0) * d, b = Math.min(1, Math.max(0, (kd - 1) / 1)); // de 1 a 2: del modelo de masa al geométrico
+		return lumped * (1 - b) + geo * b;
+	});
+}
+const OUT = '/tmp/claude-0/-home-user-Acustica3D/67763e73-2314-5de2-9c39-bfbb4f041583/scratchpad/';
+it('estética', async () => {
+	const s = await loadScene();
+	const A = alphaTable(s, EXTRA);
+	const Y = 1.1;
+	const kh = { khL: [1.376, Y, -5.673] as V3, khR: [2.743, Y, -5.672] as V3 };
+	const E: V3 = [2.06, Y, -4.167];
+	const ears: V3[] = [E, [E[0] - 0.1, Y, E[2]], [E[0], Y, E[2] - 0.1], [E[0], Y, E[2] + 0.1], [E[0], Y + 0.05, E[2]], [E[0], Y - 0.05, E[2]]];
+	/** piezas de gen_mesas.mjs (coordenadas de SketchUp) a la app */
+	const fromGen = (build: unknown, remap: Record<string, string> = {}, keep: (name: string) => boolean = () => true) => {
+		const out = { positions: [] as number[], materials: [] as string[] };
+		for (const g of collect(build) as { name: string; mat: string; tris: number[][] }[]) {
+			if (!keep(g.name)) continue;
+			for (const [x, y, z] of g.tris) out.positions.push(x, z, -y);
+			for (let i = 0; i < g.tris.length / 3; i++) out.materials.push(remap[g.mat] ?? g.mat);
+		}
+		return out;
+	};
+	const inst = (kind: 'teclado' | 'pad') => {
+		const out: any = { positions: [], materials: [] };
+		if (kind === 'teclado') prism(out, 2.06 - 0.475, 2.06 + 0.475, -4.67, -4.95, 0.76, 0.76, 0.85, 0.85, PL);
+		else prism(out, 2.78 - 0.15, 2.78 + 0.15, -4.67, -4.97, 0.76, 0.76, 0.81, 0.81, PL);
+		return out;
+	};
+	const curves: Record<string, number[][]> = {}, refls: Record<string, { ms: number; db: number; src: string; surf: string }[]> = {};
+	const rows: string[] = [];
+	const run = (label: string, mk: () => { pos: number[]; mats: string[] }) => {
+		const sds: number[] = [], ers: number[] = [];
+		let n = 0;
+		for (const ear of ears) {
+			const e = evaluate(mk() as any, A, { ...kh, ear }, 3);
+			sds.push(e.sd); n += e.early.length;
+			ers.push(10 * Math.log10(e.refl.filter((q) => q.ms <= 20).reduce((a, q) => a + 10 ** (q.db / 10), 0) / 2));
+			if (ear === E) { curves[label] = [e.rL, e.rR]; refls[label] = e.refl.filter((q) => q.ms <= 60).map((q) => ({ ms: q.ms, db: q.db, src: q.p.src, surf: q.surf })); }
+		}
+		const m = (v: number[]) => v.reduce((a, b) => a + b) / v.length;
+		const row = `${label.padEnd(52)} media ${m(sds).toFixed(2)} (${Math.min(...sds).toFixed(2)}–${Math.max(...sds).toFixed(2)}) tempranas ${(n / 6).toFixed(1)} ER20 ${m(ers).toFixed(1)}`;
+		console.log(row);
+		rows.push(JSON.stringify({ label, mean: m(sds), min: Math.min(...sds), max: Math.max(...sds), early: n / 6, er20: m(ers) }));
+	};
+	const noDesk = (m: string) => m !== 'Madera DM';
+	const scrUtil = (g: any) => ((g.pos = moveScreen(g.pos, g.mats, [0, 0.94 - 0.821, -5.75 + 5.375], 0, [2.06, 0.821, -5.375])), g);
+	const scrDis = (g: any) => ((g.pos = moveScreen(g.pos, g.mats, [0, 0.8 - 0.821, -5.75 + 5.375], 0, [2.06, 0.821, -5.375])), g);
+	const R = 'Retícula sobre lana';
+	EXTRA[R] = holedAlpha(0.054, 0.019, 0.81, 31);
+	/** la pantalla colgada de la aleta (borde de abajo a 0,95 m) y sin su pie */
+	let drop = 0; // cuánto se baja la pantalla (recorte en el puente)
+	const hang = (g: { pos: number[]; mats: string[] }) => {
+		g.pos = moveScreen(g.pos, g.mats, [0, 0.95 - 0.926 - drop, -5.75 + 5.375], 0, [2.06, 0.821, -5.375]);
+		const pos: number[] = [], mats: string[] = [];
+		for (let t = 0; t < g.mats.length; t++) {
+			const ys = [1, 4, 7].map((k) => g.pos[t * 9 + k]);
+			if (g.mats[t] === 'Pantalla del ordenador' && Math.max(...ys) < 0.948 - drop) continue;
+			for (let k = 0; k < 9; k++) pos.push(g.pos[t * 9 + k]);
+			mats.push(g.mats[t]);
+		}
+		return { pos, mats };
+	};
+	// la retícula y la lana de la balda cuentan como «retícula sobre lana» (los listones van dentro)
+	const final = (extra: any[] = []) => () => hang(assemble(s, noDesk, [fromGen(mesaUtilDiseno, {}, (n: string) => !/retícula|lana bajo/.test(n)), fromGen(mesaUtilDiseno, { 'Lana Roca 80kg_m3': R }, (n: string) => /lana bajo/.test(n)), ...extra]));
+	// el puente con un recorte en el centro (detrás) para que baje la pantalla
+	const cut = () => { const o: any = { positions: [], materials: [] };
+		prism(o, 1.15, 2.96, -5.55, -5.68, 0.92, 0.92, 0.94, 0.94, 'Madera DM');
+		prism(o, 1.15, 1.62, -5.68, -5.95, 0.92, 0.92, 0.94, 0.94, 'Madera DM');
+		prism(o, 2.5, 2.96, -5.68, -5.95, 0.92, 0.92, 0.94, 0.94, 'Madera DM');
+		return o; };
+	const finalCut = (extra: any[] = []) => () => hang(assemble(s, noDesk, [fromGen(mesaUtilDiseno, {}, (n: string) => !/retícula|lana bajo|Puente - tablero/.test(n)), fromGen(mesaUtilDiseno, { 'Lana Roca 80kg_m3': R }, (n: string) => /lana bajo/.test(n)), cut(), ...extra]));
+	drop = 0.06; // pantalla con el centro a 1,10 m (recorte en el puente, ya en gen_mesas.mjs)
+	run('Sin mesa (solo la sala y la pantalla)', () => assemble(s, noDesk, []));
+	run('Tu mesa de tres cuerpos', () => assemble(s, () => true, []));
+	run('Mesa nueva con la balda toda de madera', () => hang(assemble(s, noDesk, [fromGen(mesaUtilDiseno, { 'Lana Roca 80kg_m3': 'Madera DM' }, (n: string) => !/retícula/.test(n))])));
+	run('Mesa nueva', final());
+	run('Mesa nueva + teclado MIDI encima', final([inst('teclado')]));
+	run('Mesa nueva + pad a un lado', final([inst('pad')]));
+	writeFileSync(OUT + 'estetica.json', JSON.stringify({ f: FREQS, curves, refls, rows: rows.map((r) => JSON.parse(r)) }));
+	expect(1).toBe(1);
+}, 3600000);

@@ -1,0 +1,117 @@
+<!doctype html><meta charset="utf-8">
+<style>html,body{margin:0;background:#111}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./three/build/three.module.js","three/addons/":"./three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
+RectAreaLightUniformsLib.init();
+const P = new URLSearchParams(location.search);
+const VIEW = P.get('v') ?? '1', PAL = P.get('p') ?? 'grafito';
+const W = 1600, H = 1000;
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+r.setSize(W, H); r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.0; r.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(r.domElement);
+const scene = new THREE.Scene();
+const A = await (await fetch('arco.json')).json(); // { A: ARCO, parts }
+const { xc, ye, D, ear } = A.A;
+// paletas «premium»: cuerpo muy mate, madera, tela, aletas, LED
+const PALS = {
+	grafito: { body: 0x18191b, wood: 0x5b4331, fabric: 0x26282c, fin: 0x1c1d20, led: 0xffcf9a, pie: 0x0b0b0c, wall: 0xd9d5cf, floor: 0x9d968c, bg: 0x262628, rough: 0.92 },
+	blanco: { body: 0xe8e5df, wood: 0xb58c5c, fabric: 0x8e8b86, fin: 0xcfc9bf, led: 0xffd7a8, pie: 0x2a2a2c, wall: 0xe4e0d9, floor: 0xb9b1a5, bg: 0x2e2d2b, rough: 0.9 },
+	nogal: { body: 0x232428, wood: 0x6a4127, fabric: 0x3b3430, fin: 0x2b2622, led: 0xbfe2ff, pie: 0x0b0b0c, wall: 0xd4d0ca, floor: 0x8f887e, bg: 0x232325, rough: 0.85 }
+};
+const C = PALS[PAL];
+scene.background = new THREE.Color(C.bg);
+const std = (color, rough = 0.6, metal = 0.02, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, ...extra });
+const MAT = {
+	cuerpo: std(C.body, C.rough), roble: std(C.wood, 0.55), tela: std(C.fabric, 1), aleta: std(C.fin, 0.8), pie: std(C.pie, 0.6, 0.3),
+	led: new THREE.MeshBasicMaterial({ color: C.led }), sub: std(0x141416, 0.7), telafina: std(C.fabric, 1, 0, { transparent: true, opacity: 0.6, depthWrite: false })
+};
+// sala
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 10), std(C.floor, 0.9));
+floor.rotation.x = -Math.PI / 2; floor.position.set(2, 0, -4); floor.receiveShadow = true; scene.add(floor);
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(8, 3), std(C.wall, 0.95)); wall.position.set(2, 1.5, -6.656); wall.receiveShadow = true; scene.add(wall);
+const wallL = new THREE.Mesh(new THREE.PlaneGeometry(10, 3), std(C.wall, 0.95)); wallL.rotation.y = Math.PI / 2; wallL.position.set(0, 1.5, -4); wallL.receiveShadow = true; scene.add(wallL);
+// la mesa (SketchUp x, y, z → three x, z, −y)
+for (const p of A.parts) {
+	if (P.get('nosub') && p.finish === 'sub') continue;
+	const a = new Float32Array(p.tris.length * 3);
+	p.tris.forEach((v, i) => { a[i * 3] = v[0]; a[i * 3 + 1] = v[2]; a[i * 3 + 2] = -v[1]; });
+	const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(a, 3)); g.computeVertexNormals();
+	const mesh = new THREE.Mesh(g, MAT[p.finish] ?? MAT.cuerpo); mesh.castShadow = p.finish !== 'led'; mesh.receiveShadow = true; scene.add(mesh);
+}
+const add = (geo, mat, x, y, z, ry = 0, parent = scene) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = m.receiveShadow = true; parent.add(m); return m; };
+// KH 120 A (182 × 277 × 229 mm): frontal en el radio D, girados hacia el oído; eje a 17 cm de la base
+for (const s of [-1, 1]) {
+	const a = (s * Math.PI) / 6, fx = xc + D * Math.sin(a), fz = -(ye + D * Math.cos(a));
+	const ry = Math.atan2(xc - fx, -ye - fz);
+	const grp = new THREE.Group(); grp.position.set(fx - 0.1145 * Math.sin(ry), ear - 0.17 + 0.003, fz - 0.1145 * Math.cos(ry)); grp.rotation.y = ry;
+	const box = add(new THREE.BoxGeometry(0.182, 0.277, 0.229), std(0x2c2d30, 0.6), 0, 0.1385, 0, 0, grp);
+	const ring = (rad, y, col) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, 0.01, 40), std(col, 0.5, 0.2)); c.rotation.x = Math.PI / 2; c.position.set(0, y, 0.1155); grp.add(c); };
+	ring(0.068, 0.095, 0x1a1a1b); ring(0.045, 0.095, 0x3a3a3c); ring(0.042, 0.215, 0x1c1c1d); ring(0.012, 0.215, 0x777779);
+	const logo = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.006, 0.004), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x88ccff, emissiveIntensity: 1 })); logo.position.set(0, 0.025, 0.1165); grp.add(logo);
+	scene.add(grp);
+}
+// pantalla curva de 34" con su pie, en el rebaje (pie a 78,5 cm, centro a 1,10 m)
+{
+	const th = 0.82, R = 1.0, zf = -(ye + D * Math.cos(Math.PI / 6) + 0.06);
+	const geo = new THREE.CylinderGeometry(R, R, 0.36, 48, 1, true, Math.PI - th / 2, th);
+	const scr = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x0a1020, emissive: 0x1b3a6a, emissiveIntensity: 0.55, side: THREE.DoubleSide, roughness: 0.2 }));
+	scr.position.set(xc, 1.1, zf + R); scene.add(scr);
+	const back = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.02, R + 0.02, 0.4, 48, 1, true, Math.PI - th / 2 - 0.01, th + 0.02), std(0x111113, 0.5, 0.1, { side: THREE.DoubleSide }));
+	back.position.copy(scr.position); scene.add(back);
+	add(new THREE.BoxGeometry(0.06, 0.24, 0.03), std(0x1a1a1c, 0.4, 0.4), xc, 0.785 + 0.12, zf - 0.09);
+	add(new THREE.BoxGeometry(0.3, 0.012, 0.2), std(0x1a1a1c, 0.4, 0.4), xc, 0.791, zf - 0.13);
+	const glow = new THREE.RectAreaLight(0x5d8cff, 1.0, 0.8, 0.36); glow.position.set(xc, 1.1, zf + 0.01); glow.lookAt(xc, 1.12, 0); scene.add(glow);
+}
+// instrumentos: teclado MIDI de 61 teclas en la balda (inclinada 8°), pad a un lado; teclado y ratón en la bandeja
+{
+	const S = A.shelf, tk = Math.tan((S.tilt * Math.PI) / 180);
+	const yAt = (rr) => S.y + (rr - S.c) * tk;
+	const kr = S.r0 + 0.17, kz = -(ye + kr);
+	const kb = new THREE.Group(); kb.position.set(xc, yAt(kr) + 0.03, kz); kb.rotation.x = Math.atan(tk); scene.add(kb);
+	add(new THREE.BoxGeometry(0.95, 0.06, 0.28), std(0x141416, 0.5), 0, 0, 0, 0, kb);
+	add(new THREE.BoxGeometry(0.86, 0.02, 0.15), std(0xf2f2ee, 0.35), 0, 0.04, 0.065, 0, kb);
+	for (let i = 0; i < 36; i++) { const n = i % 7; if (n === 2 || n === 6) continue; add(new THREE.BoxGeometry(0.012, 0.014, 0.09), std(0x0c0c0d, 0.4), -0.43 + (i + 1) * 0.0239, 0.055, 0.035, 0, kb); }
+	for (let i = 0; i < 8; i++) add(new THREE.CylinderGeometry(0.008, 0.008, 0.012, 16), std(0x888888, 0.3, 0.5), -0.34 + i * 0.03, 0.035, -0.1, 0, kb);
+	const pa = (33 * Math.PI) / 180, pr = S.r0 + 0.2, pad = new THREE.Group();
+	pad.position.set(xc + pr * Math.sin(pa), yAt(pr) + 0.018, -(ye + pr * Math.cos(pa))); pad.rotation.set(Math.atan(tk), -pa, 0, 'YXZ'); scene.add(pad);
+	add(new THREE.BoxGeometry(0.26, 0.035, 0.26), std(0x151517, 0.5), 0, 0, 0, 0, pad);
+	for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) add(new THREE.BoxGeometry(0.05, 0.01, 0.05), new THREE.MeshStandardMaterial({ color: 0x2b2b2e, emissive: (i + j) % 3 ? 0x3a7bd5 : 0xff4d6d, emissiveIntensity: 0.35 }), -0.09 + i * 0.06, 0.022, -0.09 + j * 0.06, 0, pad);
+	add(new THREE.BoxGeometry(0.44, 0.025, 0.14), std(0x2a2a2d, 0.5), xc - 0.06, 0.6625, -(ye + 0.36));
+	add(new THREE.BoxGeometry(0.065, 0.035, 0.11), std(0x2a2a2d, 0.4), xc + 0.3, 0.6675, -(ye + 0.36));
+}
+// LED como luces de área
+const strip = (x, y, z, w, h, look, i = 2.5) => { const l = new THREE.RectAreaLight(C.led, i, w, h); l.position.set(x, y, z); l.lookAt(...look); scene.add(l); };
+const S = A.shelf;
+for (let a = -48; a <= 48; a += 12) { const t = (a * Math.PI) / 180, rr = S.r0 + 0.02; strip(xc + rr * Math.sin(t), S.y - (S.c - rr) * Math.tan((S.tilt * Math.PI) / 180) - 0.03, -(ye + rr * Math.cos(t)), 0.13, 0.02, [xc + rr * Math.sin(t), 0, -(ye + rr * Math.cos(t))], 6); }
+for (let a = -36; a <= 36; a += 6) { if (Math.abs(a) < 18) continue; const t = (a * Math.PI) / 180, rr = D - 0.015; strip(xc + rr * Math.sin(t), ear - 0.2, -(ye + rr * Math.cos(t)), 0.14, 0.02, [xc + rr * Math.sin(t), 0, -(ye + rr * Math.cos(t))], 6); }
+strip(xc, 0.015, -(ye + 0.8), 2.0, 0.6, [xc, 0, -(ye + 0.8)], 3);
+strip(xc, ear - 0.2, -(A.yB + 0.01), 1.7, 0.03, [xc, ear, -6.7], 18);
+// luz general
+scene.add(new THREE.HemisphereLight(0xffffff, 0x4a4a4a, PAL === 'blanco' ? 0.75 : 0.55));
+const fill = new THREE.DirectionalLight(0xdfe8ff, 0.6); fill.position.set(4, 2.5, -2.5); fill.target.position.set(2, 0.7, -5); scene.add(fill, fill.target);
+const rim = new THREE.SpotLight(0xffffff, 5, 6, 0.6, 0.6); rim.position.set(xc, 2.6, -6.4); rim.target.position.set(xc, 0.8, -5.2); scene.add(rim, rim.target);
+const key = new THREE.DirectionalLight(0xfff4e8, 1.4); key.position.set(-1, 4, -2); key.target.position.set(2, 0.6, -5); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048); Object.assign(key.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3, near: 0.5, far: 12 }); scene.add(key, key.target);
+const VIEWS = {
+	'1': [[xc - 1.55, 1.65, -(ye - 0.95)], [xc - 0.05, 0.8, -(ye + 1.0)], 42],
+	'3': [[xc + 1.05, 1.3, -(ye - 0.2)], [xc, 0.7, -(ye + 0.8)], 46],
+	'4': [[xc, 1.32, -(ye - 0.75)], [xc, 0.85, -(ye + 1.1)], 42],
+	'5': [[xc + 2.1, 0.95, -(ye + 0.75)], [xc, 0.6, -(ye + 0.75)], 40],
+	'6': [[xc - 0.25, 1.55, -(ye + 0.15)], [xc, 0.72, -(ye + 0.75)], 50]
+};
+let cam;
+if (VIEW === 'lado') {
+	wall.visible = false; wallL.visible = false; scene.background = new THREE.Color(0x34353a);
+	const h = 0.8, w = h * (W / H);
+	cam = new THREE.OrthographicCamera(-w, w, h, -h, 0.1, 20); cam.position.set(9, 0.75, -(ye + 0.85)); cam.lookAt(0, 0.75, -(ye + 0.85));
+	scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+} else {
+	const [pos, tgt, fov] = VIEWS[VIEW];
+	cam = new THREE.PerspectiveCamera(fov, W / H, 0.05, 30); cam.position.set(...pos); cam.lookAt(...tgt);
+}
+r.render(scene, cam);
+window.__done = true;
+</script>

@@ -1,0 +1,15 @@
+import { chromium } from '/home/user/acustica3d/acustica3d/node_modules/playwright/index.mjs';
+const [URL, OUT] = process.argv.slice(2);
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const p = await b.newPage({ viewport: { width: 1600, height: 1000 } });
+p.on('pageerror', (e) => console.log('pageerror', e.message));
+await p.goto(URL);
+await p.click('button:has-text("Sala de ejemplo")');
+await p.waitForSelector('text=/^Hecho: /', { timeout: 600000 });
+await p.click('role=tab[name="Mejor posición"]');
+await p.locator('label', { hasText: 'Desde (Hz)' }).locator('input').fill('20');
+await p.locator('label', { hasText: 'Hasta (Hz)' }).locator('input').fill('500');
+await p.locator('label', { hasText: 'Hasta (Hz)' }).locator('input').press('Tab');
+await p.waitForTimeout(1500);
+await p.screenshot({ path: OUT + '/chart.png', clip: { x: 360, y: 640, width: 1240, height: 360 } });
+await b.close();

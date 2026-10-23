@@ -216,26 +216,38 @@ function edgeAt(ap: Aperture, j: number, th: number, i: number): number {
 /** Amplitud (respecto a sin obstáculos) que deja pasar la abertura para una zona de Fresnel de radio
  *  `r`: integral de Fresnel–Kirchhoff (1/2π)∫dθ ∫ (jπ/r²)·e^(−jπρ²/r²)·2ρ dρ sobre lo libre. En cada
  *  ángulo, cada tramo libre [a, b] aporta e^(−jπa²/r²) − e^(−jπb²/r²); el ángulo se integra en NSUB
- *  pasos por sector con el borde interpolado como recta. Más allá del último anillo, como en él. */
+ *  pasos por sector con el borde interpolado como recta. En cada paso, el término de cada borde se
+ *  pondera con sinc(Δφ/2), con Δφ lo que gira su fase de un extremo del paso al otro: es la integral
+ *  exacta si la fase varía linealmente en el paso. Lejos del centro (muchas zonas de Fresnel) la fase
+ *  gira deprisa con el ángulo y los bordes se cancelan, como debe ser; sin esto, una tira fina lejos del
+ *  punto de rebote contaba casi como un tablero entero. Más allá del último anillo, como en él. */
 export function apertureAmp(ap: Aperture, r: number): number {
 	const k = Math.PI / (r * r);
+	const half = STEP / NSUB / 2;
 	let re = 0, im = 0;
-	const add = (a: number, b: number) => {
-		re += Math.cos(k * a * a) - (b === Infinity ? 0 : Math.cos(k * b * b));
-		im += -Math.sin(k * a * a) + (b === Infinity ? 0 : Math.sin(k * b * b));
+	/** término del borde a radio x (signo s), con la fase de los extremos del paso en xl y xh; los bordes
+	 *  a más de 3–4 radios (más de ~12 zonas) se apagan poco a poco: ahí su aporte se cancela con el de
+	 *  los vecinos (y las paredes de la sala no son pantallas, son espejos: van por las imágenes) */
+	const term = (x: number, xl: number, xh: number, s: number) => {
+		if (x === Infinity) return;
+		const d = xl === Infinity || xh === Infinity ? 0 : k * (xh * xh - xl * xl);
+		const w = (Math.abs(d) < 1e-6 ? 1 : Math.sin(d / 2) / (d / 2)) * Math.exp(-((x / (3.5 * r)) ** 4));
+		re += s * w * Math.cos(k * x * x);
+		im -= s * w * Math.sin(k * x * x);
 	};
 	for (let j = 0; j < DIRS; j++) {
 		const n = Math.max(ap.edges[j].length, ap.edges[(j + 1) % DIRS].length);
 		for (let q = 0; q < NSUB; q++) {
 			const th = DIR_A[j] + ((q + 0.5) / NSUB) * STEP;
-			let open = ap.center, from = 0;
+			let open = ap.center, from = 0, fl = 0, fh = 0;
 			for (let i = 0; i < n; i++) {
 				const x = Math.max(from, edgeAt(ap, j, th, i));
 				if (x === Infinity) break;
-				if (open) add(from, x);
-				(open = !open), (from = x);
+				const xl = Math.max(fl, edgeAt(ap, j, th - half, i)), xh = Math.max(fh, edgeAt(ap, j, th + half, i));
+				if (open) { term(from, fl, fh, 1); term(x, xl, xh, -1); }
+				(open = !open), (from = x), (fl = xl), (fh = xh);
 			}
-			if (open) add(from, Infinity);
+			if (open) term(from, fl, fh, 1);
 		}
 	}
 	return Math.hypot(re, im) / (DIRS * NSUB);

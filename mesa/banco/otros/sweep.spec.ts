@@ -1,0 +1,33 @@
+import { it, expect } from 'vitest';
+import { loadScene, alphaTable, assemble, evaluate } from './hfeval';
+import { makeDesk, moveScreen, EXTRA, type DeskParams } from './desk';
+import type { V3 } from '../lib/sim/voxel';
+it('barrido', async () => {
+	const s = await loadScene();
+	const A = alphaTable(s, EXTRA);
+	const st = { khL: s.devices.khL!, khR: s.devices.khR!, ear: s.devices.listener! };
+	const kh = { L: st.khL, R: st.khR, bottom: 0.95 };
+	const D: DeskParams = { x0: 1.13, x1: 2.98, top: 0.73, front: -4.62, back: -5.95, kh, khStand: { w: 0.19, d: 0.24, plate: 0.02 }, pad: { z0: -4.85, z1: -5.2, h: 0.05 } };
+	const run = (label: string, p: DeskParams, scr: V3 = [0, p.top - 0.82, 0], tilt = 0, show = false) => {
+		const geo = assemble(s, (m) => m !== 'Madera DM', [makeDesk(p)]);
+		geo.pos = moveScreen(geo.pos, geo.mats, scr, tilt, [2.06, 0.82, -5.37]);
+		const e = evaluate(geo, A, st, 3);
+		const er = (low: boolean) => 10 * Math.log10(e.refl.filter((r) => r.ms <= 5).reduce((a, r) => a + 10 ** ((low ? r.dbLow : r.db) / 10), 0) / 2 + 1e-9);
+		console.log(`${label.padEnd(40)} sd ${e.sd.toFixed(2)} pp ${e.pp.toFixed(1)} n>-20 ${e.early.length}  ER5 ${er(false).toFixed(1)} / ${er(true).toFixed(1)}`);
+		if (show) for (const r of e.refl.filter((r) => r.ms < 20).sort((a, b) => b.db - a.db).slice(0, 8)) console.log(`     ${r.p.soft ? '~' : ' '}${r.p.src} ${r.ms.toFixed(1)} ms ${r.db.toFixed(1)} dB (300–1k ${r.dbLow.toFixed(1)}) ${r.surf}`);
+		return e;
+	};
+	run('D', D, undefined, 0, true);
+	for (const z0 of [-4.75, -4.8, -4.9]) run(`pad z0 ${z0}`, { ...D, pad: { ...D.pad!, z0 } });
+	for (const z1 of [-5.1, -5.3]) run(`pad z1 ${z1}`, { ...D, pad: { ...D.pad!, z1 } });
+	run('pad 3 cm', { ...D, pad: { ...D.pad!, h: 0.03, mat: 'Lana Roca 80kg_m3 (mesa 30)' } });
+	run('fieltro (en vez de lana)', { ...D, pad: { ...D.pad!, h: 0.005, mat: 'Fieltro' } });
+	for (const top of [0.7, 0.76]) run(`altura ${top}`, { ...D, top });
+	run('repisa KH 0,92 (como la tuya)', { ...D, khStand: undefined, khShelf: { y: 0.92, front: -5.47, back: -5.95 } });
+	run('repisa KH 0,92 al ras del frontal', { ...D, khStand: undefined, khShelf: { y: 0.92, front: -5.56, back: -5.95 } });
+	run('mesa hasta -5,45, KH en pies de suelo', { ...D, back: -5.45 });
+	for (const dz of [-0.15, -0.35]) run(`pantalla ${dz} m hacia atrás`, D, [0, D.top - 0.82, dz]);
+	run('pantalla 8 cm más alta', D, [0, D.top - 0.82 + 0.08, 0]);
+	for (const t of [8, 15]) run(`pantalla inclinada ${t}°`, D, undefined, t);
+	expect(1).toBe(1);
+}, 1800000);

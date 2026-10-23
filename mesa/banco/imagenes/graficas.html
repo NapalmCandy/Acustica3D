@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Gráficas mesa</title>
+<style>
+:root { --bg:#ffffff; --ink:#1d2330; --ink2:#556070; --muted:#8a94a3; --grid:#e6e9ee; --axis:#c3c9d2;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --neutral:#b4bbc6; --band:#f1f4f8; }
+body { margin:0; background:#f4f5f7; font-family: "Inter","Segoe UI",system-ui,sans-serif; color:var(--ink); }
+.fig { background:var(--bg); width:1200px; padding:28px 32px 24px; box-sizing:border-box; margin:0 0 20px; }
+h2 { margin:0 0 4px; font-size:22px; font-weight:650; }
+.sub { margin:0 0 14px; color:var(--ink2); font-size:14.5px; line-height:1.4; }
+.legend { display:flex; gap:22px; font-size:14px; color:var(--ink2); margin:0 0 6px; flex-wrap:wrap; }
+.legend span { display:inline-flex; align-items:center; gap:7px; }
+.legend i { width:18px; height:3px; border-radius:2px; display:inline-block; }
+.legend i.sq { width:12px; height:12px; border-radius:3px; }
+svg text { font-family: inherit; }
+.note { font-size:13px; color:var(--muted); margin-top:6px; }
+</style></head><body>
+<div class="fig" id="f1"></div>
+<div class="fig" id="f2"></div>
+<div class="fig" id="f3"></div>
+<div class="fig" id="f4"></div>
+<script type="module">
+const J = await (await fetch('estetica.json')).json();
+const W = await (await fetch('wing.json')).json();
+const NS = 'http://www.w3.org/2000/svg';
+const el = (tag, at = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.appendChild(e); return e; };
+const txt = (p, x, y, s, at = {}) => { const t = el('text', { x, y, 'font-size': 13, fill: '#556070', ...at }, p); t.textContent = s; return t; };
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmtHz = (f) => (f >= 1000 ? (f / 1000).toString().replace('.', ',') + 'k' : String(f));
+const dec = (x, n = 2) => x.toFixed(n).replace('.', ',');
+
+// ---------- 1. respuesta en el oído ----------
+const smooth = (f, y, frac = 6) => f.map((fc) => {
+  const lo = fc * 2 ** (-1 / (2 * frac)), hi = fc * 2 ** (1 / (2 * frac));
+  let s = 0, n = 0; for (let i = 0; i < f.length; i++) if (f[i] >= lo && f[i] <= hi) { s += 10 ** (y[i] / 10); n++; }
+  return 10 * Math.log10(s / n);
+});
+{
+  const host = document.getElementById('f1');
+  host.innerHTML = `<h2>Respuesta en el oído, con el oído a 1,10 m</h2>
+  <p class="sub">Sonido directo + reflexiones hasta 3 rebotes (medios y agudos), suavizado a 1/6 de octava. La zona gris (300 Hz–4 kHz) es la que mide la desviación: cuanto más plana, menos colorea la mesa.</p>
+  <div class="legend"><span><i style="background:var(--s1)"></i>Mesa nueva</span><span><i style="background:var(--s2)"></i>Tu mesa de tres cuerpos</span><span><i style="background:var(--s3)"></i>Sin mesa (solo sala y pantalla)</span></div>`;
+  const series = [['Tu mesa de tres cuerpos', '--s2', 'Tu mesa'], ['Sin mesa (solo la sala y la pantalla)', '--s3', 'Sin mesa'], ['Mesa nueva', '--s1', 'Nueva']];
+  const pw = 1136, ph = 300, m = { l: 46, r: 78, t: 26, b: 34 };
+  const svg = el('svg', { width: pw, height: ph * 2 + 10, viewBox: `0 0 ${pw} ${ph * 2 + 10}` }, host);
+  const f0 = 300, f1 = 16000, y0 = -8, y1 = 6;
+  const X = (f) => m.l + ((Math.log(f) - Math.log(f0)) / (Math.log(f1) - Math.log(f0))) * (pw - m.l - m.r);
+  [0, 1].forEach((ch) => {
+    const g = el('g', { transform: `translate(0 ${ch * (ph + 10)})` }, svg);
+    const Y = (v) => m.t + ((y1 - v) / (y1 - y0)) * (ph - m.t - m.b);
+    el('rect', { x: X(300), y: m.t, width: X(4000) - X(300), height: ph - m.t - m.b, fill: css('--band') }, g);
+    for (let v = y0; v <= y1; v += 2) { el('line', { x1: m.l, x2: pw - m.r, y1: Y(v), y2: Y(v), stroke: v === 0 ? css('--axis') : css('--grid'), 'stroke-width': 1 }, g); txt(g, m.l - 8, Y(v) + 4, (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v), { 'text-anchor': 'end', fill: '#8a94a3' }); }
+    for (const f of [300, 500, 1000, 2000, 4000, 8000, 16000]) { el('line', { x1: X(f), x2: X(f), y1: m.t, y2: ph - m.b, stroke: css('--grid') }, g); if (ch === 1) txt(g, X(f), ph - m.b + 20, fmtHz(f) + (f === 16000 ? ' Hz' : ''), { 'text-anchor': 'middle', fill: '#8a94a3' }); }
+    txt(g, m.l, m.t - 9, ch ? 'KH derecho (dB)' : 'KH izquierdo (dB)', { 'font-size': 14, 'font-weight': 600, fill: '#1d2330' });
+    const ends = [];
+    for (const [k, c, short] of series) {
+      const raw = J.curves[k][ch], ys = smooth(J.f, raw);
+      let d = ''; J.f.forEach((f, i) => { if (f < f0 * 0.97 || f > f1 * 1.03) return; d += (d ? 'L' : 'M') + X(Math.min(f1, Math.max(f0, f))).toFixed(1) + ' ' + Y(Math.max(y0, Math.min(y1, ys[i]))).toFixed(1); });
+      el('path', { d, fill: 'none', stroke: css(c), 'stroke-width': k === 'Mesa nueva' ? 2.4 : 2, 'stroke-linejoin': 'round', opacity: k === 'Mesa nueva' ? 1 : 0.9 }, g);
+      const iEnd = J.f.findLastIndex((f) => f <= f1);
+      ends.push({ y: Y(ys[iEnd]), short, c });
+    }
+    // etiquetas directas al final de cada curva, separadas para que no se pisen
+    ends.sort((a, b) => a.y - b.y); for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 16) ends[i].y = ends[i - 1].y + 16;
+    for (const e of ends) { el('rect', { x: pw - m.r + 8, y: e.y - 5, width: 10, height: 3, rx: 1.5, fill: css(e.c) }, g); txt(g, pw - m.r + 22, e.y + 1, e.short, { fill: '#1d2330', 'font-size': 12.5, 'dominant-baseline': 'middle' }); }
+  });
+}
+
+// ---------- 2. reflectograma ----------
+const cls = (surf) => /Madera DM|Retícula|Lana Roca 80|Metal pie KH/.test(surf) ? 'mesa' : /Plástico duro/.test(surf) ? 'pantalla' : 'sala';
+{
+  const host = document.getElementById('f2');
+  host.innerHTML = `<h2>Reflexiones que llegan al oído (KH izquierdo)</h2>
+  <p class="sub">Cada palito es un rebote: cuánto llega tarde respecto al sonido directo (escala logarítmica) y su nivel relativo al directo, de 1 a 8 kHz. Las de la mesa que llegan en menos de 1 ms son las que pintan el peine en medios. La línea de −20 dB es el objetivo habitual de una «zona libre de reflexiones» en los primeros 20 ms.</p>
+  <div class="legend"><span><i class="sq" style="background:var(--s2)"></i>En la mesa</span><span><i class="sq" style="background:var(--s1)"></i>En la sala (suelo, techo, paredes, tratamiento)</span></div>`;
+  const pw = 1136, ph = 250, m = { l: 46, r: 20, t: 30, b: 34 };
+  const svg = el('svg', { width: pw, height: ph * 2 + 12, viewBox: `0 0 ${pw} ${ph * 2 + 12}` }, host);
+  const t0 = 0.05, t1 = 60, d0 = -40, d1 = -5;
+  const X = (t) => m.l + ((Math.log(t) - Math.log(t0)) / (Math.log(t1) - Math.log(t0))) * (pw - m.l - m.r);
+  const col = { mesa: css('--s2'), pantalla: css('--s2'), sala: css('--s1') };
+  [['Tu mesa de tres cuerpos', 'Tu mesa de tres cuerpos'], ['Mesa nueva', 'Mesa nueva']].forEach(([k, title], row) => {
+    const g = el('g', { transform: `translate(0 ${row * (ph + 12)})` }, svg);
+    const Y = (v) => m.t + ((d1 - v) / (d1 - d0)) * (ph - m.t - m.b);
+    el('rect', { x: X(t0), y: m.t, width: X(20) - X(t0), height: ph - m.t - m.b, fill: css('--band') }, g);
+    for (let v = d0; v <= d1; v += 5) { el('line', { x1: m.l, x2: pw - m.r, y1: Y(v), y2: Y(v), stroke: css('--grid') }, g); txt(g, m.l - 8, Y(v) + 4, '−' + Math.abs(v), { 'text-anchor': 'end', fill: '#8a94a3' }); }
+    for (const t of [0.1, 0.3, 1, 3, 10, 20, 60]) { el('line', { x1: X(t), x2: X(t), y1: m.t, y2: ph - m.b, stroke: css('--grid') }, g); if (row === 1) txt(g, X(t), ph - m.b + 20, String(t).replace('.', ',') + (t === 60 ? ' ms' : ''), { 'text-anchor': 'middle', fill: '#8a94a3' }); }
+    el('line', { x1: X(t0), x2: X(20), y1: Y(-20), y2: Y(-20), stroke: '#1d2330', 'stroke-dasharray': '5 4', 'stroke-width': 1.3 }, g);
+    txt(g, X(t0) + 6, Y(-20) - 6, '−20 dB', { fill: '#1d2330', 'font-size': 12 });
+    const R = J.refls[k].filter((q) => q.src === 'khL' && q.ms >= t0 && q.ms <= t1 && q.db > d0).sort((a, b) => a.db - b.db);
+    for (const q of R) {
+      const c = col[cls(q.surf)];
+      el('line', { x1: X(q.ms), x2: X(q.ms), y1: Y(d0), y2: Y(q.db), stroke: c, 'stroke-width': 2, 'stroke-linecap': 'round' }, g);
+      el('circle', { cx: X(q.ms), cy: Y(q.db), r: 4, fill: c, stroke: '#fff', 'stroke-width': 2 }, g);
+    }
+    const desk = R.filter((q) => q.ms < 20 && cls(q.surf) !== 'sala');
+    const e20 = 10 * Math.log10(J.refls[k].filter((q) => q.src === 'khL' && q.ms <= 20).reduce((a, q) => a + 10 ** (q.db / 10), 0));
+    const worst = desk.reduce((a, q) => Math.max(a, q.db), -99);
+    txt(g, m.l, m.t - 11, title, { 'font-size': 14, 'font-weight': 600, fill: '#1d2330' });
+    txt(g, pw - m.r, m.t - 11, `Rebote más fuerte en mesa/pantalla: ${dec(worst, 1).replace('-', '−')} dB · energía de los primeros 20 ms: ${dec(e20, 1).replace('-', '−')} dB`, { 'text-anchor': 'end', 'font-size': 13, fill: '#556070' });
+  });
+}
+
+// ---------- 3. barras de desviación ----------
+{
+  const host = document.getElementById('f3');
+  host.innerHTML = `<h2>Cuánto colorea cada opción</h2>
+  <p class="sub">Desviación de la respuesta (300 Hz–4 kHz, 1/6 de octava), media de 6 posiciones de la cabeza (centro, ±10 cm a los lados, adelante/atrás y ±5 cm en altura). La barrita fina va de la mejor a la peor posición. Menos es mejor; diferencias de menos de 0,2 dB no se oyen.</p>
+  <div class="legend"><span><i class="sq" style="background:var(--s1)"></i>Mesa nueva (con lo que pongas encima)</span><span><i class="sq" style="background:var(--neutral)"></i>Referencias</span></div>`;
+  const rows = J.rows, pw = 1136, rh = 46, m = { l: 330, r: 60, t: 10, b: 36 };
+  const ph = m.t + m.b + rh * rows.length;
+  const svg = el('svg', { width: pw, height: ph, viewBox: `0 0 ${pw} ${ph}` }, host);
+  const v1 = 3.4, X = (v) => m.l + (v / v1) * (pw - m.l - m.r);
+  for (let v = 0; v <= 3; v += 0.5) { el('line', { x1: X(v), x2: X(v), y1: m.t, y2: ph - m.b, stroke: v ? css('--grid') : css('--axis') }, svg); txt(svg, X(v), ph - m.b + 20, dec(v, 1) + (v === 3 ? ' dB' : ''), { 'text-anchor': 'middle', fill: '#8a94a3' }); }
+  const nice = { 'Sin mesa (solo la sala y la pantalla)': 'Sin mesa (solo sala y pantalla)', 'Mesa nueva con la balda toda de madera': 'Mesa nueva, balda toda de madera', 'Mesa nueva': 'Mesa nueva (retícula sobre lana)' };
+  rows.forEach((r, i) => {
+    const y = m.t + i * rh + rh / 2, isNew = /^Mesa nueva/.test(r.label) && !/toda de madera/.test(r.label);
+    const c = isNew ? css('--s1') : css('--neutral');
+    txt(svg, m.l - 14, y + 5, nice[r.label] ?? r.label, { 'text-anchor': 'end', 'font-size': 14.5, fill: '#1d2330', 'font-weight': r.label === 'Mesa nueva' ? 650 : 400 });
+    el('path', { d: `M${X(0)} ${y - 11}H${X(r.mean) - 4}a4 4 0 0 1 4 4v14a4 4 0 0 1 -4 4H${X(0)}Z`, fill: c }, svg);
+    el('line', { x1: X(r.min), x2: X(r.max), y1: y, y2: y, stroke: '#1d2330', 'stroke-width': 1.5 }, svg);
+    for (const v of [r.min, r.max]) el('line', { x1: X(v), x2: X(v), y1: y - 6, y2: y + 6, stroke: '#1d2330', 'stroke-width': 1.5 }, svg);
+    txt(svg, X(r.max) + 10, y + 5, dec(r.mean) + ' dB', { 'font-size': 14, fill: '#1d2330', 'font-weight': 600 });
+  });
+}
+
+// ---------- 4. alzado lateral acotado ----------
+{
+  const host = document.getElementById('f4');
+  host.innerHTML = `<h2>Alzado lateral (medidas en cm)</h2>
+  <p class="sub">Corte por el centro de la mesa. El lateral «en ala» une los tres niveles en una sola pieza; la pantalla se hunde en el recorte del puente para quedar con su centro a la altura de los ojos.</p>`;
+  const pw = 1136, ph = 640;
+  const svg = el('svg', { width: pw, height: ph, viewBox: `0 0 ${pw} ${ph}` }, host);
+  const S = 420, Y0 = 3.9, Zf = 580; // 1 m = 420 px
+  const X = (y) => 40 + (y - Y0) * S, Z = (z) => Zf - z * S;
+  const ink = '#1d2330', dim = '#556070';
+  // suelo
+  el('line', { x1: 20, x2: pw - 20, y1: Z(0), y2: Z(0), stroke: ink, 'stroke-width': 1.5 }, svg);
+  for (let x = 24; x < pw - 20; x += 14) el('line', { x1: x, x2: x - 8, y1: Z(0), y2: Z(0) + 8, stroke: css('--axis') }, svg);
+  // lateral (silueta)
+  el('path', { d: 'M' + W.map(([y, z]) => `${X(y).toFixed(1)} ${Z(z).toFixed(1)}`).join('L') + 'Z', fill: '#e9ebef', stroke: ink, 'stroke-width': 1.5 }, svg);
+  // panel de nogal en el lateral
+  el('rect', { x: X(5.25), y: Z(0.7), width: (0.6) * S, height: 0.52 * S, rx: 0.08 * S, fill: '#b98a5e', opacity: 0.28 }, svg);
+  const box = (y0, y1, z0, z1, at) => el('rect', { x: X(y0), y: Z(z1), width: (y1 - y0) * S, height: (z1 - z0) * S, ...at }, svg);
+  // puente, trasera, zócalo, tela + listones
+  box(5.55, 5.68, 0.92, 0.94, { fill: '#2b2f36' }); box(5.68, 5.95, 0.92, 0.94, { fill: 'none', stroke: '#2b2f36', 'stroke-dasharray': '4 3' });
+  box(5.93, 5.95, 0, 0.92, { fill: '#2b2f36' }); box(5.6, 5.93, 0, 0.1, { fill: '#2b2f36' });
+  box(5.535, 5.575, 0.1, 0.9, { fill: '#8d7a68', opacity: 0.85 });
+  // aleta y pantalla
+  box(5.905, 5.93, 0.5, 1.3, { fill: '#2b2f36' });
+  box(5.80, 5.885, 0.90, 1.30, { fill: '#121826', rx: 4 });
+  el('path', { d: `M${X(5.80)} ${Z(1.28)}Q${X(5.73)} ${Z(1.10)} ${X(5.80)} ${Z(0.92)}`, fill: 'none', stroke: '#121826', 'stroke-width': 2, 'stroke-dasharray': '3 3' }, svg);
+  // KH 120 A (23 × 27,7 cm) en tacos
+  box(5.55, 5.78, 0.945, 0.945 + 0.277, { fill: '#3a3d43', rx: 6 });
+  el('circle', { cx: X(5.55) + 3, cy: Z(1.10), r: 5, fill: css('--s2') }, svg);
+  // balda: marco, lana, fondo
+  box(4.65, 5.05, 0.74, 0.76, { fill: '#2b2f36' });
+  box(4.72, 5.0, 0.729, 0.76, { fill: '#9a8f86' });
+  box(4.72, 5.0, 0.726, 0.729, { fill: '#2b2f36' });
+  // bandeja
+  box(4.40, 4.72, 0.63, 0.65, { fill: '#a06f43' });
+  // oyente: cabeza y línea de los ojos/oído
+  el('circle', { cx: X(4.167), cy: Z(1.13), r: 0.095 * S, fill: 'none', stroke: ink, 'stroke-width': 1.5 }, svg);
+  el('path', { d: `M${X(4.167) - 4} ${Z(1.03)}Q${X(4.10)} ${Z(0.86)} ${X(4.02)} ${Z(0.6)}`, fill: 'none', stroke: ink, 'stroke-width': 1.5 }, svg);
+  el('circle', { cx: X(4.167), cy: Z(1.10), r: 4, fill: ink }, svg);
+  el('line', { x1: X(4.167), x2: X(5.55), y1: Z(1.10), y2: Z(1.10), stroke: css('--s2'), 'stroke-width': 1.4, 'stroke-dasharray': '6 4' }, svg);
+  txt(svg, X(4.45), Z(1.10) - 8, 'oído y ojos a 110: eje del KH y centro de la pantalla', { fill: '#b2481a', 'font-size': 13 });
+  // cotas de altura (a la derecha)
+  const hdim = (z, label, x) => { el('line', { x1: x - 8, x2: x + 8, y1: Z(z), y2: Z(z), stroke: dim }, svg); txt(svg, x + 12, Z(z) + 4, label, { fill: ink, 'font-size': 13 }); };
+  const xr = X(6.08);
+  el('line', { x1: xr, x2: xr, y1: Z(0), y2: Z(1.30), stroke: dim }, svg);
+  hdim(0, '0', xr); hdim(0.10, '10 zócalo', xr); hdim(0.94, '94 puente', xr); hdim(1.10, '110 oído, eje KH, pantalla', xr); hdim(1.30, '130 borde alto pantalla', xr); hdim(1.222, '122 techo del KH', xr);
+  el('line', { x1: xr - 8, x2: xr + 8, y1: Z(0.90), y2: Z(0.90), stroke: dim }, svg); txt(svg, xr + 12, Z(0.90) + 14, '90 borde bajo pantalla', { fill: ink, 'font-size': 13 });
+  // cotas a la izquierda de la balda y la bandeja
+  const xl = X(4.33);
+  el('line', { x1: xl, x2: xl, y1: Z(0), y2: Z(0.76), stroke: dim }, svg);
+  const ldim = (z, label) => { el('line', { x1: xl - 8, x2: xl + 8, y1: Z(z), y2: Z(z), stroke: dim }, svg); txt(svg, xl - 12, Z(z) + 4, label, { fill: ink, 'font-size': 13, 'text-anchor': 'end' }); };
+  ldim(0.65, 'bandeja 65'); ldim(0.76, 'balda 76'); ldim(0, '0');
+  // hueco de 7,6 cm
+  const xg = X(4.86);
+  el('line', { x1: xg, x2: xg, y1: Z(0.726), y2: Z(0.65), stroke: css('--s1'), 'stroke-width': 1.5 }, svg);
+  for (const z of [0.726, 0.65]) el('line', { x1: xg - 5, x2: xg + 5, y1: Z(z), y2: Z(z), stroke: css('--s1'), 'stroke-width': 1.5 }, svg);
+  txt(svg, xg + 8, Z(0.70) + 3, '7,6 libre: la bandeja entra debajo', { fill: '#1d5fae', 'font-size': 12.5 });
+  // cotas de fondo
+  const hz = Z(0) + 34;
+  const ddim = (a, b, label, z = hz) => { el('line', { x1: X(a), x2: X(b), y1: z, y2: z, stroke: dim }, svg); for (const y of [a, b]) el('line', { x1: X(y), x2: X(y), y1: z - 6, y2: z + 6, stroke: dim }, svg); txt(svg, (X(a) + X(b)) / 2, z - 6, label, { 'text-anchor': 'middle', fill: ink, 'font-size': 13 }); };
+  ddim(4.615, 5.95, 'fondo total 134');
+  ddim(4.40, 4.72, 'bandeja 32', Z(0.65) + 22); txt(svg, X(4.40), Z(0.65) + 42, '63 libres debajo', { fill: dim, 'font-size': 12.5 });
+  ddim(4.65, 5.05, 'balda 40', Z(0.76) - 34);
+  // rótulos
+  const lab = (x, y, s, a = 'start') => txt(svg, x, y, s, { fill: dim, 'font-size': 12.5, 'text-anchor': a });
+  lab(X(5.06), Z(0.30), 'lateral «en ala», DM 38 mm'); lab(X(5.71), Z(0.25), 'panel de nogal', 'middle');
+  txt(svg, X(5.665), Z(1.17), 'KH 120 A', { fill: '#fff', 'font-size': 12.5, 'text-anchor': 'middle' }); lab(X(5.93), Z(1.30) - 10, 'pantalla 34" curva, placa VESA fija en la aleta', 'end');
+  lab(X(5.52), Z(0.50), 'frente del puente:', 'end'); lab(X(5.52), Z(0.50) + 16, 'tela + listones', 'end');
+  lab(X(4.70), Z(0.76) - 8, 'retícula sobre lana');
+}
+window.__done = true;
+</script></body></html>

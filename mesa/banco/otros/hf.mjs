@@ -1,0 +1,22 @@
+import { chromium } from '/home/user/acustica3d/acustica3d/node_modules/playwright/index.mjs';
+const [URL, FILE, OUT] = process.argv.slice(2);
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const p = await b.newPage({ viewport: { width: 1600, height: 1000 } });
+p.on('pageerror', (e) => console.log('pageerror', e.message));
+p.on('console', (m) => { if (m.type() === 'error') console.log('console', m.text()); });
+await p.goto(URL);
+await p.setInputFiles('#model-file', FILE);
+await p.click('role=tab[name="Medios y agudos"]');
+await p.waitForSelector('text=/reflexiones en/', { timeout: 120000 });
+console.log(await p.locator('text=/reflexiones en/').innerText());
+console.log((await p.locator('text=/reflexiones tempranas|zona libre/').first().innerText()));
+const t = await p.locator('#hf-problems').innerText().catch(() => '');
+console.log(t.split('\n').slice(0, 12).join('\n'));
+await p.screenshot({ path: OUT + '/hf_mesa.png', clip: { x: 360, y: 600, width: 1240, height: 400 } });
+// sin la mesa
+await p.locator('li', { hasText: 'Madera DM' }).first().locator('input[type=checkbox]').uncheck();
+await p.waitForTimeout(800);
+await p.waitForSelector('text=/reflexiones en/', { timeout: 120000 });
+console.log('SIN MESA:', await p.locator('text=/reflexiones en/').innerText(), '·', await p.locator('text=/reflexiones tempranas|zona libre/').first().innerText());
+await p.screenshot({ path: OUT + '/hf_sinmesa.png', clip: { x: 360, y: 600, width: 1240, height: 400 } });
+await b.close();

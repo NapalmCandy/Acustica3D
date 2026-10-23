@@ -84,3 +84,12 @@ Idioma de trabajo: **español**. El usuario produce hardcore/gabber, escucha alt
 - Calibración con medidas de REW.
 - Exportar filtros al plugin.
 - Corrección a nivel de sistema en Windows (tipo Sonarworks).
+
+## Trabajo en curso (23-10-2026)
+- **Ver `mesa/TRASPASO.md`.** Recoge:
+  - lo que dice el manual del KH 120;
+  - el triángulo de 1,40 m elegido con el análisis;
+  - la mesa «Arco» (`mesaArco` en `gen_mesas.mjs`);
+  - la corrección del motor de agudos en `hf/fresnel.ts`;
+  - lo pendiente, en orden.
+- Scripts del banco de pruebas: `mesa/banco/`.

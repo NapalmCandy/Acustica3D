@@ -48,6 +48,34 @@ describe('difracción por zonas de Fresnel', () => {
 		for (const v of big.slice(2)) expect(Math.abs(db(v))).toBeLessThan(0.5);
 	});
 
+	// óptica física (integral de Kirchhoff sobre la cara de arriba, rígida) respecto al plano infinito
+	const po = (x0: number, x1: number, z0: number, z1: number, S: number[], E: number[], f: number) => {
+		const k = (2 * Math.PI * f) / 343, h = Math.min(0.004, 343 / f / 14);
+		const L = Math.hypot(E[0] - S[0], E[1] + S[1], E[2] - S[2]);
+		let re = 0, im = 0;
+		for (let x = x0 + h / 2; x < x1; x += h)
+			for (let z = z0 + h / 2; z < z1; z += h) {
+				const r1 = Math.hypot(x - S[0], S[1], z - S[2]), r2 = Math.hypot(E[0] - x, E[1], E[2] - z);
+				const a = ((k / (4 * Math.PI)) * (S[1] / r1 + E[1] / r2) * h * h) / (r1 * r2), ph = -k * (r1 + r2 - L);
+				(re += a * Math.cos(ph)), (im += a * Math.sin(ph));
+			}
+		return Math.hypot(re, im) * L;
+	};
+
+	it('un tablero mediano refleja como dice la óptica física (±2,5 dB) y una tira fina lejana, casi nada', () => {
+		const S = [0, 1, -1], E = [0, 1, -3];
+		const one = (x0: number, x1: number, z0: number, z1: number) => {
+			const r: NamedTris = { positions: [], materials: [] };
+			addBox(r, [x0, -0.02, z0], [x1, 0, z1], 'tabla');
+			return run(r, S as [number, number, number], E as [number, number, number], 1).find((p) => p.order === 1)?.fres;
+		};
+		const mid = one(-0.2, 0.2, -2.2, -1.8)!;
+		for (const f of [1000, 2000, 4000, 8000]) expect(Math.abs(db(mid[HF_OCTAVES.indexOf(f)]) - db(po(-0.2, 0.2, -2.2, -1.8, S, E, f)))).toBeLessThan(2.5);
+		// tira de 2 cm × 80 cm a 60 cm del punto de rebote: la óptica física da unos −50 dB
+		const strip = one(0.6, 0.62, -2.4, -1.6);
+		for (const f of [1000, 2000, 4000, 8000]) expect(strip ? db(strip[HF_OCTAVES.indexOf(f)]) : -99).toBeLessThan(-30);
+	});
+
 	it('la cara de abajo de un tablero no refleja lo que llega por arriba', () => {
 		const r: NamedTris = { positions: [], materials: [] };
 		addBox(r, [-1, 0.7, -2.5], [1, 0.73, -1.5], 'mesa');
