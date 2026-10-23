@@ -304,12 +304,7 @@ function mesaArco(G, A = ARCO) {
 			G(`Pie adhesivo KH ${s < 0 ? 'izquierdo' : 'derecho'}`, 'Metal pie KH', 'pie', box([cx - 0.012, cy - 0.012, top], [cx + 0.012, cy + 0.012, top + 0.003]));
 		}
 	}
-	// frente de listones de roble sobre tela negra, retranqueado 12 cm del canto (no hace de bafle)
-	const rS = rEdge + 0.12, lim = Math.asin((A.half - 0.05) / rS) * (180 / Math.PI);
-	G('Frente - tela', 'Lana Roca 80kg_m3', 'tela', ...sectorSolids(rS + 0.02, rS + 0.04, -lim, lim, 0.15, top - T, 1.5));
-	const sl = [];
-	for (let a = -lim; a < lim; a += (0.035 / rS) * (180 / Math.PI)) sl.push(...sectorSolids(rS, rS + 0.02, a, a + (0.02 / rS) * (180 / Math.PI), 0.15, top - T, 5));
-	G('Frente - listones', 'Madera DM', 'roble', ...sl);
+	// sin frente bajo el puente: el de listones empeoraba los agudos (ver mesa/TRASPASO.md)
 	// balda de instrumentos: corona de ±52°, inclinada 8° hacia ti; ventana de aletas de 3 mm cada 4 cm sobre lana
 	// de 3 cm (fondo de 3 mm), todo forrado de tela; brazos hasta los laterales
 	const zT = (x, y) => zs(Math.hypot(x - A.xc, y - A.ye));

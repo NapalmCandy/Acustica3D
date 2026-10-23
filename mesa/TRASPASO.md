@@ -171,4 +171,9 @@ Medido con D = 1,40, el oyente en (2,05, Y 4,19) y la geometría real de `mesaAr
 - **Queda pendiente:**
   - de 3 a 16 kHz aún pierde 0,09 dB (0,62 frente a 0,53), muy por debajo de lo que se oye (unos 0,2 dB);
   - el peine pasa de −36 a −22 dB (más rebotes cortos, aunque débiles).
-- **Siguiente paso:** quitar el frente de listones de `mesaArco`. El ancho apenas cambia nada; queda en `half` 0,96.
+- **Hecho después:** frente de listones quitado de `mesaArco`, con `Mesa_arco.dae` regenerado e imagen `mesa/Mesa_arco.png`. El ancho apenas cambia nada; queda en `half` 0,96.
+- **Siguientes pasos:**
+  - estética premium (ver «Pendiente», punto 4);
+  - gráficas (punto 5);
+  - README y CLAUDE.md (punto 6);
+  - suite completa y versión 0.10.3 por la corrección del motor (punto 1).
