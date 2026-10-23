@@ -4,6 +4,7 @@ Idioma de trabajo: **español**. El usuario produce hardcore/gabber, escucha alt
 
 ## Equipo y sala del usuario
 - **Monitores:** 2 × Neumann KH 120 A sobre el escritorio, a ~1,5 m de la pared trasera y ~2 m de cada lateral; distancia de escucha ~1,2 m a la altura de los oídos.
+- **Altura del oído medida: 1,10 m** (el dibujo del v0.05 la tiene a 1,22 m). Quiere los KH a esa altura y sin inclinar (el timbre no debe cambiar al moverse con la silla).
 - **Sub:** ADAM Sub8 en el suelo, bajo el KH izquierdo.
   - Tiene filtro de satélites de 85 Hz conmutable y mando IR (corte y volumen).
   - El usuario cambia a mano el filtro y la fase (0/180°).
@@ -51,6 +52,7 @@ Idioma de trabajo: **español**. El usuario produce hardcore/gabber, escucha alt
   - *Con lana*: tablero 185 × 88 cm a 73 cm, franja de lana 80 kg/m³ de 5 cm × 30 cm a 23 cm del borde, KH en pies de suelo (bandeja a 95 cm). Desviación (300 Hz–4 kHz, 1/6 oct, media de 6 posiciones de cabeza) 2,75 → 1,11 dB.
   - *Sin lana* (pedida para teclado + teclado MIDI + torre): franja de 185 × 32 cm con el borde a Y 4,50, inclinada 10° (sube hacia los KH: su rebote va al pecho), bandeja MIDI extraíble de 105 × 30 cm a 60 cm, torre en el suelo a la izquierda, nada detrás (pantalla en brazo VESA). 1,22 dB. Un tablero detrás sin lana devuelve el rebote (3,0 dB).
   - *Tres cuerpos mejorada* (la idea del usuario: cuerpos con ruedas que se meten uno dentro de otro, KH sobre la mesa por seguridad con niñas y gatos, sin brazo VESA, DM pintado): alto 185 × 40 cm a 95 cm con el frontal del KH al ras (Y 5,55–5,95), medio 105 × 38 cm a 74 cm para la pantalla (Y 5,40–5,78), bajo 96 × 28 cm a 62 cm para teclado y ratón (Y 4,45–4,73). 2,73 → 1,29 dB. Su diseño original fallaba por difracción en los bordes (la prueba del espejo de SketchUp es óptica de rayos).
+  - *Mesa útil* (en marcha, `Mesa_util.dae`): instrumentos a mano (balda a 75 cm, Y 4,65–5,05) con **ventana de lana a ras** donde rebota el sonido (idea del usuario; 1,60 dB vacía, 1,59 con un teclado encima; sin mesa 1,78), bandeja de teclado a 66 cm debajo (7 cm de hueco), KH a 1,10 m sobre tablero a 0,94, pantalla detrás entre los KH. Probado y descartado: DM taladrado (refleja por encima de 1 kHz), difusores (no actúan en 0,5–2 kHz con poca profundidad), balda inclinada, bajar los KH. Lo estético va después.
   - **Mapa de zonas sensibles** (`Mapa_zonas_sensibles.png`, `Mapa_tres_cuerpos.png`): nivel que manda al oído un borde en cada punto (zonas de Fresnel + |F(v)| de un borde + directividad del KH), alzado y plantas. Generado con scripts de la sesión; idea: llevarlo a la app.
   - La lana dentro de un grupo «mesa» se queda fija (`scene.ts`); «plástico/teclado» → plástico duro, «metal» → metal.
 - **Lanzador:** Edge con `--force_high_performance_gpu` (el usuario tiene una RTX 3080 y Edge cogía la integrada).

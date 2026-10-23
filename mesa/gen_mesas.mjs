@@ -1,6 +1,6 @@
 // Mesas acústicas para el Estudio v0.05: genera los .dae para importar en SketchUp (Z arriba, en el
 // origen del modelo, metros de SketchUp: X a lo ancho, Y hacia la pared frontal, Z arriba).
-// Uso: node mesa/gen_mesas.mjs   → mesa/Mesa_con_lana.dae, mesa/Mesa_sin_lana.dae y mesa/Mesa_tres_cuerpos.dae
+// Uso: node mesa/gen_mesas.mjs   → mesa/Mesa_con_lana.dae, Mesa_sin_lana.dae, Mesa_tres_cuerpos.dae y Mesa_util.dae
 import { writeFileSync } from 'node:fs';
 
 const COLOR = {
@@ -81,6 +81,28 @@ function tresCuerpos(G) {
 	side('Bajo - lateral derecho', 2.515, 4.45, 4.73, 0.62);
 }
 
+function mesaUtil(G) {
+	// en marcha: lo útil primero (instrumentos a mano, teclado debajo), con el oído a 1,10 m y los KH a esa altura
+	const T = 0.02;
+	// detrás: los KH (eje a 1,10 m, frontal al ras) y la pantalla entre ellos, más atrás
+	G('KH - tablero', 'Madera DM', box([1.131, 5.55, 0.94 - T], [2.981, 5.95, 0.94]));
+	G('KH - lateral izquierdo', 'Madera DM', box([1.131, 5.55, 0], [1.151, 5.95, 0.94 - T]));
+	G('KH - lateral derecho', 'Madera DM', box([2.961, 5.55, 0], [2.981, 5.95, 0.94 - T]));
+	G('KH - trasera baja', 'Madera DM', box([1.151, 5.93, 0], [2.961, 5.95, 0.5]));
+	// balda de instrumentos a mano (75 cm), con una ventana de lana de roca a ras donde rebota el sonido
+	const zb = 0.75, y0 = 4.65, y1 = 5.05, wx0 = 1.3, wx1 = 2.82, wy0 = 4.72, wy1 = 5.0;
+	G('Balda - marco delantero', 'Madera DM', box([1.15, y0, zb - T], [2.96, wy0, zb]));
+	G('Balda - marco trasero', 'Madera DM', box([1.15, wy1, zb - T], [2.96, y1, zb]));
+	G('Balda - lado izquierdo', 'Madera DM', box([1.15, wy0, zb - T], [wx0, wy1, zb]));
+	G('Balda - lado derecho', 'Madera DM', box([wx1, wy0, zb - T], [2.96, wy1, zb]));
+	G('Balda - ventana de lana', 'Lana Roca 80kg_m3', box([wx0, wy0, zb - 0.05], [wx1, wy1, zb]));
+	G('Balda - fondo de la ventana', 'Madera DM', box([wx0, wy0, zb - 0.056], [wx1, wy1, zb - 0.05]));
+	G('Balda - lateral izquierdo', 'Madera DM', box([1.15, y0, 0], [1.17, y1, zb - T]));
+	G('Balda - lateral derecho', 'Madera DM', box([2.94, y0, 0], [2.96, y1, zb - T]));
+	// bandeja de teclado y ratón (66 cm), 7 cm por debajo de la balda; se mete bajo ella con guías
+	G('Bandeja teclado', 'Madera DM', box([1.18, 4.4, 0.66 - T], [2.93, 4.72, 0.66]));
+}
+
 function dae(build) {
 	const groups = [];
 	build((name, mat, ...solids) => groups.push({ name, mat, solids }));
@@ -111,4 +133,5 @@ function dae(build) {
 writeFileSync(new URL('./Mesa_con_lana.dae', import.meta.url), dae(conLana));
 writeFileSync(new URL('./Mesa_sin_lana.dae', import.meta.url), dae(sinLana));
 writeFileSync(new URL('./Mesa_tres_cuerpos.dae', import.meta.url), dae(tresCuerpos));
-console.log('ok: mesa/Mesa_con_lana.dae, mesa/Mesa_sin_lana.dae, mesa/Mesa_tres_cuerpos.dae');
+writeFileSync(new URL('./Mesa_util.dae', import.meta.url), dae(mesaUtil));
+console.log('ok: mesa/Mesa_con_lana.dae, mesa/Mesa_sin_lana.dae, mesa/Mesa_tres_cuerpos.dae, mesa/Mesa_util.dae');

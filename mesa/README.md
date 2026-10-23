@@ -113,6 +113,36 @@ Es la misma idea: tres cuerpos con ruedas que se meten uno dentro de otro, los K
 - Cada cuerpo de un color, o los tres iguales con el canto de otro color. Escalonados, los tres niveles ya llaman la atención por sí solos.
 - Un zócalo de 7 cm puede tapar las ruedas: acústicamente da igual, está a ras de suelo.
 
+## Mesa útil (en marcha)
+
+La mesa de tres cuerpos mejorada deja la balda de instrumentos lejos, donde no se alcanza. Aquí va lo útil primero:
+- los instrumentos (teclado MIDI, pad, mesa de DJ) a mano, en una balda a 75 cm;
+- la bandeja del teclado y el ratón debajo, a 66 cm, con 7 cm de hueco hasta la balda;
+- los KH a la altura del oído medido, **1,10 m**, sin inclinarlos (el timbre no cambia al moverte con la silla);
+- la pantalla entre los KH y detrás, con su centro a la altura de los ojos.
+
+Archivo: [`Mesa_util.dae`](Mesa_util.dae). Los tres cuerpos con ruedas no son imprescindibles.
+
+**Ideas probadas** para la balda de instrumentos, que está justo donde rebota el sonido. Media de seis posiciones de cabeza, con el oído centrado a 1,10 m:
+
+| Opción | Desviación |
+|---|---|
+| Sin mesa (solo la sala) | 1,78 dB |
+| Balda de madera, vacía | 2,18 dB |
+| **Balda con una ventana de lana de roca de 152 × 28 cm, a ras, donde rebota el sonido** | **1,60 dB** |
+| Lo mismo, con el teclado MIDI encima de la lana (de forma provisional) | 1,59 dB |
+| Ventana de lana con rejilla metálica encima (chapa de 1,5 mm, agujeros de 10 mm, 40 % abierta) | 1,67 dB |
+| DM de 19 mm taladrado, sin nada debajo (agujeros de 6–12 mm cada 16–25 mm) | 1,92–2,14 dB |
+| DM de 19 mm taladrado sobre lana | 1,91 dB |
+| Balda inclinada 15° con ventana de lana | 1,90 dB |
+| Difusor QRD de 10 cm en la ventana (estimado; no se puede apoyar nada) | ≈ 1,8 dB |
+| La mesa con lana de arriba (sin instrumentos a mano) | 1,37 dB |
+
+- **La ventana de lana** deja la mesa acústicamente como si no estuviera: 1,60 dB, frente a 1,78 dB sin mesa. Con un instrumento encima de forma provisional, igual. Mejor con tela fina; con rejilla metálica fina, casi igual y más resistente.
+- **El DM taladrado no sirve.** Con 19 mm de grosor cada agujero es un tubo de aire con masa: deja pasar los graves, que aquí no importan, y refleja de 1 kHz para arriba, que es justo lo que molesta. Solo funciona muy fino y muy abierto, y eso ya es una rejilla.
+- **Los difusores tampoco.** Para actuar a 500 Hz–2 kHz necesitan 10 cm de fondo o más. Uno de taladros ciegos de 3 cm solo trabaja por encima de 2–4 kHz.
+- **Lo que queda ya es de la sala:** el rebote en el suelo, el techo y las paredes. Para bajar de ahí ayuda que la mesa tape el suelo sin reflejar, como hace la mesa con lana.
+
 ## Cómo meterla en tu modelo
 
 1. Saca la pantalla del grupo de la mesa actual y borra la mesa.
