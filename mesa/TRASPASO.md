@@ -150,3 +150,25 @@ Estado del trabajo para que otra sesión pueda seguirlo. Los scripts están en `
    - corrección del motor;
    - reglas del manual.
 7. **En la app:** fuente en el frontal del KH, apuntando al oído, y la caja como obstáculo en medios y agudos (`scene.ts`, `hf/`).
+
+## Resultado con el motor corregido (última medida de la sesión)
+
+Medido con D = 1,40, el oyente en (2,05, Y 4,19) y la geometría real de `mesaArco`, como media de 6 posiciones de cabeza. Datos en `mesa/banco/resultados/corregido_c1.json` y `corregido_c2.json`.
+
+| | 0,3–3 kHz | 3–16 kHz | Total (peor) | Fase | L/R | Peine (< 2 ms) | 20 ms |
+|---|---|---|---|---|---|---|---|
+| Sin mesa | 1,56 dB | 0,53 dB | 1,25 (1,29) | 9,1° | 0,42 | −36,0 dB | −14,7 dB |
+| **Arco sin frente de listones** | **1,08** | 0,62 | **0,93 (1,02)** | **7,1°** | **0,37** | −21,7 | **−20,7** |
+| Arco con frente | 1,07 | 0,66 | 0,95 (1,13) | 7,1° | 0,41 | −21,3 | −20,3 |
+| Arco a 2,16 m de ancho, sin frente | 1,06 | 0,62 | 0,92 (0,98) | 6,7° | 0,39 | −22,4 | −20,7 |
+
+- **Frente a no tener mesa, la mesa «Arco» mejora:**
+  - 0,3–3 kHz;
+  - fase;
+  - simetría L/R;
+  - zona libre de reflexiones: −20,7 dB, cumple el objetivo de −20 dB;
+  - total: de 1,25 a 0,93 dB.
+- **Queda pendiente:**
+  - de 3 a 16 kHz aún pierde 0,09 dB (0,62 frente a 0,53), muy por debajo de lo que se oye (unos 0,2 dB);
+  - el peine pasa de −36 a −22 dB (más rebotes cortos, aunque débiles).
+- **Siguiente paso:** quitar el frente de listones de `mesaArco`. El ancho apenas cambia nada; queda en `half` 0,96.
