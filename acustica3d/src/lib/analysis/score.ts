@@ -38,6 +38,13 @@ export const CRITERIA: { id: Criterion; label: string; help: string }[] = [
 	{ id: 'geometria', label: 'Geometría', help: 'Triángulo con los KH, distancia razonable y delante de ellos.' }
 ];
 
+/** Criterio que solo usa la colocación automática en modo ULTRA (no el mapa de «Mejor posición»). */
+export const HF_CRITERION = {
+	id: 'reflexiones' as const,
+	label: 'Medios y agudos',
+	help: 'Solo en ULTRA: energía de las reflexiones que llegan a tu oído en los primeros 20 ms (1–8 kHz, respecto al directo), con la mesa, la pantalla y el tratamiento colocado. −18 dB o menos = 100; −3 dB = 0.'
+};
+
 // Pesos: la imagen estéreo (simetría y distancia a paredes) cuenta tanto como los huecos de grave,
 // que tampoco se corrigen con DSP; los picos pesan poco porque el DSP sí los recorta.
 export const DEFAULT_WEIGHTS: Record<Criterion, number> = {

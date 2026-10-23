@@ -53,7 +53,7 @@ La prueba sintética (`skp.spec.ts`) construye un `.skp` mínimo. Con `SKP_FILE=
 
 ### Validación
 
-`npx vitest run`, 61 pruebas. Las de física (más la de reciprocidad):
+`npx vitest run`, 53 pruebas. Las de física (más la de reciprocidad):
 - **Campo libre:** 0 dB ± 1 dB a 1 m.
 - **Sala rígida:** modos a menos del 2,5 % de c/2L.
 - **Inversión α↔β** coherente.
@@ -84,6 +84,17 @@ Prueba de extremo a extremo en Chromium: `node testdata/e2e.mjs URL gpu|cpu`. Co
 
 
 ## Historial de cambios
+
+### v0.10.0
+- **Colocación automática ULTRA** (Precisión «ULTRA (≈ 1 h)»), para encontrar la mejor combinación aunque tarde:
+  - KH cada 5 cm (en vez de 10) y aperturas de 45° a 75° cada 5°; el sub en una rejilla de 12,5 cm (en vez de 25). Para no multiplicar por 10 lo que cuesta puntuar (≈ 6 µs por combinación), se puntúa como siempre (KH cada 10 cm con 50/60/70°, sub cada 25 cm) y se afina alrededor de las 12 mejores parejas (±5 cm, ±5°) con el sub cada 12,5 cm cerca de sus 3 mejores sitios; las respuestas de cada punto se calculan solo si se usan;
+  - búsqueda bayesiana con más presupuesto (40 + 6 por m², hasta 400, y sigue mientras quede tiempo, 25 min) y después **todas** las posiciones de escucha (cada 10 cm) a menos de 30 cm de las 5 mejores;
+  - tratamiento: 3 posiciones de escucha de referencia, hasta 60 cambios de trampas comprobados y otra búsqueda completa (más todas las posiciones alrededor de las 3 mejores);
+  - las 6 mejores posiciones se vuelven a simular con una rejilla más fina (14 puntos por longitud de onda) y solo cuentan esas;
+  - los ajustes del sub y de los KH, en las 100 mejores (en vez de 40);
+  - criterio nuevo **medios y agudos** (`reflexiones`, solo en ULTRA): en las 30 finalistas, la energía de las reflexiones de los primeros 20 ms (1–8 kHz) por el método de la imagen con difracción, con los paneles llevados a las primeras reflexiones de cada una (−18 dB = 100, −3 dB = 0). Peso ajustable (1,5 por defecto).
+  - «Parar y quedarme con lo mejor»: el worker recibe `opt-stop`, se salta lo que falta (o lo corta a mitad), afina los ajustes con lo que tiene y termina.
+- Prueba `sim/ultra.spec.ts`: el worker real en Node (procesador) sobre la sala de ejemplo con una trampa y un panel recorre todas las fases y se puede parar a mitad.
 
 ### v0.9.0
 - **Difracción en medios y agudos** (`hf/fresnel.ts`): ver Física. Cambia sobre todo lo que pasa cerca de la mesa y de la pantalla: el rebote en una bandeja de teclado tapado a medias por el borde de una repisa (que antes se descartaba entero) llega a −15 dB, el borde de una repisa bajo los KH difracta, una pantalla pequeña apenas refleja en medios. En la tabla y el reflectograma, «por difracción en un borde».

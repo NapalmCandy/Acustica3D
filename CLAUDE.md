@@ -27,7 +27,7 @@ Idioma de trabajo: **español**. El usuario produce hardcore/gabber, escucha alt
 
 ## Acustica3D: puntos clave
 - **Desarrollo:**
-  - `npm install` (`.npmrc` con legacy-peer-deps), `npm run dev`, `npx vitest run` (61 pruebas), `npm run build`.
+  - `npm install` (`.npmrc` con legacy-peer-deps), `npm run dev`, `npx vitest run` (53 pruebas; `sim/ultra.spec.ts` tarda ~30 s), `npm run build`.
   - Prueba completa: `node testdata/e2e.mjs http://localhost:4173/ cpu|gpu`, con `vite preview` en marcha. Reinicia preview tras cada build.
   - No uses `pkill -f` con un patrón que aparezca en la misma orden.
 - **Simulación:**
@@ -39,6 +39,7 @@ Idioma de trabajo: **español**. El usuario produce hardcore/gabber, escucha alt
 - **Colocación automática:** `sim/optimize.ts` + `doOptimize` en `sim/sim.worker.ts`. Usa la reciprocidad: una simulación por cada posición del oyente.
   - Qué posiciones del oyente se simulan: búsqueda bayesiana por defecto (`sim/bayes.ts`: proceso gaussiano + mejora esperada sobre candidatos cada 10 cm; presupuesto en `PRECISION` de `controller.ts`) o rejilla gruesa + afinado.
   - Si el worker se cae sin mensaje, `runOptimize(true)` reintenta una vez con el procesador.
+  - **ULTRA** (Precisión «ULTRA», ≈ 1 h con GPU): KH cada 5 cm y 45–75°, sub cada 12,5 cm (puntuación gruesa y afinado alrededor de las 12 mejores parejas), bayesiana larga + todas las posiciones cerca de las 5 mejores, hasta 60 cambios de trampas, comprobación con ppw 14, ajustes en las 100 mejores y criterio `reflexiones` (medios y agudos de las 30 finalistas con `findPaths`; `earlyReflectionBad` en `sim.worker.ts`). Botón «Parar y quedarme con lo mejor» (`stopOptimize` → mensaje `opt-stop`).
   - Con tratamiento (`sim/treatment.ts`): paneles a las primeras reflexiones; trampas a huecos (esquinas y aristas, solo giros de la pieza dibujada) con valor marginal (añadir/quitar) y 8 cambios comprobados; luego otra búsqueda bayesiana corta.
 - **Importar .skp** (`geometry/scene.ts`): reconoce KH, persona+silla, pantalla, trampas/paneles de lana (objetos con `mesh` exacta, `rotX`) y capas de paredes/techo (material de la superficie según lo de detrás). Densidad de lana del nombre o de `POROUS_PRODUCTS`.
 - **Modelo del usuario:** `Estudio_v0.0x.skp` (4,12 × 6,66 × 2,67 m; 10 trampas de esquina y 3 paneles de lana de 80 kg/m³; paredes del fondo con lana Sonorock Eco de 30 kg/m³, laterales con cámara vacía; falso techo con plénum de 36 cm). No se sube al repositorio. Mesa provisional: la quiere poder quitar/poner («cuenta»); más adelante, simulación hasta 20 kHz para diseñarla.

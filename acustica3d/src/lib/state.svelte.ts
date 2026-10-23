@@ -129,9 +129,11 @@ class AppState {
 	/** colocación automática */
 	opt = $state.raw<OptState>(emptyOpt());
 	optOptions = $state({
-		facings: 'todas' as 'todas' | 'actual', sub: 'cualquiera' as 'cualquiera' | 'cerca', precision: 'normal' as 'rapida' | 'normal' | 'fina',
+		facings: 'todas' as 'todas' | 'actual', sub: 'cualquiera' as 'cualquiera' | 'cerca', precision: 'normal' as 'rapida' | 'normal' | 'fina' | 'ultra',
 		apertures: 'varias' as 'varias' | 'equilatero', tuneSub: true, tuneKh: true,
-		method: 'bayes' as 'bayes' | 'rejilla', treatment: true
+		method: 'bayes' as 'bayes' | 'rejilla', treatment: true,
+		/** peso de medios y agudos (reflexiones tempranas) en el modo ULTRA */
+		hfWeight: 1.5
 	});
 	/** celda del mapa bajo el ratón (vista previa de su respuesta), −1 = ninguna */
 	hoverCell = $state(-1);

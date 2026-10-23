@@ -84,9 +84,9 @@ export function acousticParts(
 }
 
 /** Puntuación 0–100 con los pesos del usuario (sin robustez ni geometría: el triángulo es fijo). */
-export function totalScore(parts: Partial<Record<Criterion, number>>, weights: Record<Criterion, number>): number {
+export function totalScore(parts: Partial<Record<OptCriterion, number>>, weights: Partial<Record<OptCriterion, number>>): number {
 	let bad = 0, wsum = 0;
-	for (const k of Object.keys(parts) as Criterion[]) {
+	for (const k of Object.keys(parts) as OptCriterion[]) {
 		const w = weights[k] ?? 0;
 		bad += w * (parts[k] ?? 0);
 		wsum += w;
@@ -198,5 +198,9 @@ export interface OptConfig {
 	khL: V3;
 	khR: V3;
 	sub: V3 | null;
-	parts: Partial<Record<Criterion, number>>;
+	parts: Partial<Record<OptCriterion, number>>;
 }
+
+/** Criterios de la colocación automática: los de «Mejor posición» y, en el modo ULTRA, las reflexiones
+ *  tempranas de medios y agudos (método de la imagen con difracción, con el tratamiento colocado). */
+export type OptCriterion = Criterion | 'reflexiones';

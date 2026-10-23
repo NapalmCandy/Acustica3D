@@ -36,6 +36,7 @@ Se abre en su propia ventana y **se actualiza solo** cuando hay una versión nue
   - Te dice cuánto ganarías sin mover nada, solo con esos ajustes.
   - Con un clic lo coloca y lo ajusta todo así.
   - Con «Mover también trampas y paneles» lleva los paneles a los puntos de primera reflexión y prueba las trampas de esquina en otras esquinas y aristas (cada distribución es una simulación nueva, así que tarda bastante más).
+  - **Precisión ULTRA** (hasta ≈ 1 h con una gráfica dedicada): muchas más combinaciones (KH cada 5 cm, aperturas de 45° a 75°, sub cada 12,5 cm), todas las posiciones alrededor de las mejores, más cambios de tratamiento, comprobación de las mejores con una simulación más fina y, para las finalistas, también las reflexiones de medios y agudos (mesa, pantalla y paneles). Se puede parar cuando quieras y quedarte con lo mejor hasta ese momento.
 - **Respuesta:** la curva de graves en tu sitio. Distingue los picos, que se pueden recortar con ecualización, de los huecos, que no.
 - **Decaimiento:** cuánto tarda en apagarse cada frecuencia, es decir, cuánto "retumba" la sala.
 - **Mapa de la sala:** cómo se reparte cada frecuencia por la habitación, de 20 a 300 Hz. Con **Play** se ve el barrido animado.

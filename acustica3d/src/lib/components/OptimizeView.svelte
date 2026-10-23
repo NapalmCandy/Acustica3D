@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { app, toSketchup } from '../state.svelte';
-	import { runOptimize, cancelOptimize, applyConfig } from '../sim/controller';
+	import { runOptimize, cancelOptimize, stopOptimize, applyConfig } from '../sim/controller';
 	import { scoreColor, SCORE_RAMP, YOU_COLOR, BEST_COLOR } from '../colors';
-	import { CRITERIA } from '../analysis/score';
+	import { CRITERIA, HF_CRITERION } from '../analysis/score';
 	import { KH_EQ } from '../acoustics/speakers';
 	import type { OptConfig } from '../sim/optimize';
 	import type { V3 } from '../sim/voxel';
@@ -181,12 +181,12 @@
 				</label>
 				<label>Precisión
 					<select class="input w-full" bind:value={app.optOptions.precision} disabled={opt.running}>
-						<option value="rapida">Rápida</option><option value="normal">Normal</option><option value="fina">Fina (lenta)</option>
+						<option value="rapida">Rápida</option><option value="normal">Normal</option><option value="fina">Fina (lenta)</option><option value="ultra">ULTRA (≈ 1 h)</option>
 					</select>
 				</label>
 				<label>Apertura de los KH
 					<select class="input w-full" bind:value={app.optOptions.apertures} disabled={opt.running}>
-						<option value="varias">50°, 60° y 70°</option><option value="equilatero">Solo 60° (equilátero)</option>
+						<option value="varias">{app.optOptions.precision === 'ultra' ? 'De 45° a 75° (cada 5°)' : '50°, 60° y 70°'}</option><option value="equilatero">Solo 60° (equilátero)</option>
 					</select>
 				</label>
 				<label class="col-span-2">Búsqueda
@@ -198,10 +198,19 @@
 				{#if KH_EQ.enabled}
 					<label class="col-span-3 flex items-center gap-2"><input type="checkbox" bind:checked={app.optOptions.tuneKh} disabled={opt.running} /> Ajustar los interruptores Bass y Low-Mid de los KH</label>
 				{/if}
+				{#if app.optOptions.precision === 'ultra'}
+					<label class="col-span-3 flex items-center gap-2" title={HF_CRITERION.help}>Peso de medios y agudos
+						<input class="flex-1" type="range" min="0" max="3" step="0.1" bind:value={app.optOptions.hfWeight} disabled={opt.running} aria-label="Peso de medios y agudos" />
+						<span class="w-6 text-right tabular-nums">{fmt(app.optOptions.hfWeight, 1)}</span>
+					</label>
+				{/if}
 				<label class="col-span-3 flex items-center gap-2"><input type="checkbox" bind:checked={app.optOptions.treatment} disabled={opt.running || !app.objects.length} /> Mover también trampas y paneles{app.objects.length ? ` (${app.objects.length} objetos; bastante más lento)` : ' (no hay ninguno en «Objetos»)'}</label>
 			</div>
 			<div class="mt-2 flex gap-2">
 				{#if opt.running}
+					{#if app.optOptions.precision === 'ultra'}
+						<button class="btn-primary flex-1" onclick={stopOptimize} id="opt-stop" title="Afina los ajustes con lo encontrado hasta ahora y termina">Parar y quedarme con lo mejor</button>
+					{/if}
 					<button class="btn flex-1" onclick={cancelOptimize}>Detener</button>
 				{:else}
 					<button class="btn-primary flex-1" disabled={!app.tris} onclick={start}>Buscar la mejor colocación</button>
@@ -216,6 +225,9 @@
 				Para cada posición, los KH a {fmt(Math.max(0.8, app.listenRange[0]), 1)}–{fmt(Math.min(2, app.listenRange[1]), 1)} m (cada 10 cm) {app.optOptions.apertures === 'varias' ? 'con aperturas de 50°, 60° y 70°' : 'en triángulo equilátero'}, {app.optOptions.facings === 'todas' ? 'mirando hacia cada pared' : 'con tu orientación actual'}{app.sub.enabled ? ', el sub en cada punto del suelo y su fase 0°/180°' : ''}.
 				{#if app.sub.enabled && app.optOptions.tuneSub}Después afina el corte, el nivel y el filtro de 85 Hz del sub en las 40 mejores colocaciones.{/if}
 				{#if app.optOptions.treatment && app.objects.length}Con el tratamiento: lleva los paneles planos a los puntos de primera reflexión y prueba cada trampa de esquina en las otras esquinas y en las aristas pared-techo y pared-suelo (cada distribución es una simulación nueva); después vuelve a buscar la posición de escucha.{/if}
+				{#if app.optOptions.precision === 'ultra'}
+					<b class="text-ink">ULTRA</b>: KH cada 5 cm y con aperturas de 45° a 75°, el sub cada 12,5 cm; tras la búsqueda bayesiana (más larga), simula todas las posiciones (cada 10 cm) alrededor de las 5 mejores; con el tratamiento, hasta 60 cambios de trampas y otra búsqueda completa; comprueba las 6 mejores con una rejilla más fina; afina el sub en las 100 mejores y puntúa las 30 finalistas también por medios y agudos (reflexiones tempranas, con la mesa, la pantalla y los paneles colocados). Con una gráfica dedicada, alrededor de 1 h; con el procesador, varias. Puedes pararlo cuando quieras y quedarte con lo mejor hasta ese momento.
+				{/if}
 				Puntúa con el rango de frecuencias ({app.band[0]}–{app.band[1]} Hz) y los pesos de «Mejor posición». Las paredes, el escritorio y los objetos se respetan.
 			</p>
 			{#if opt.log.length}
@@ -266,7 +278,7 @@
 				<div class="rounded-md border border-line p-2.5">
 					<div class="mb-1 font-medium text-ink">Por qué puntúa así la opción {selected + 1} (0–100, mayor = mejor)</div>
 					<div class="grid grid-cols-2 gap-x-4 gap-y-0.5">
-						{#each CRITERIA.filter((k) => shown.parts[k.id] !== undefined) as k}
+						{#each [...CRITERIA, HF_CRITERION].filter((k) => shown.parts[k.id] !== undefined) as k}
 							<div class="flex justify-between" title={k.help}><span class="text-muted">{k.label}</span><span class="tabular-nums text-ink">{fmt(100 * (1 - (shown.parts[k.id] ?? 0)))}{opt.current?.parts[k.id] !== undefined ? ` (tú ${fmt(100 * (1 - (opt.current.parts[k.id] ?? 0)))})` : ''}</span></div>
 						{/each}
 					</div>

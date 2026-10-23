@@ -266,7 +266,9 @@ let optWorker: Worker | null = null;
 const PRECISION = {
 	rapida: { ppw: 7, step: 0.6, bayes: { base: 10, perM2: 1, max: 40, timeS: 60 } },
 	normal: { ppw: 8, step: 0.45, bayes: { base: 14, perM2: 1.6, max: 60, timeS: 240 } },
-	fina: { ppw: 10, step: 0.3, bayes: { base: 18, perM2: 2.4, max: 90, timeS: 900 } }
+	fina: { ppw: 10, step: 0.3, bayes: { base: 18, perM2: 2.4, max: 90, timeS: 900 } },
+	// ULTRA: mucho más de todo (≈ 1 h con una gráfica dedicada); ver `ultra` en doOptimize
+	ultra: { ppw: 12, step: 0.2, bayes: { base: 40, perM2: 6, max: 400, timeS: 1500 } }
 } as const;
 
 /** Lanza la búsqueda de la mejor colocación (en un worker aparte: no toca la simulación normal).
@@ -301,13 +303,16 @@ export function runOptimize(retry = false) {
 	const square = Math.round(rawFacing / 90) * 90;
 	const curFacing = Math.abs(rawFacing - square) <= 15 ? ((square % 360) + 360) % 360 : Math.round(rawFacing);
 	const distances: number[] = [];
-	for (let d = Math.max(0.8, app.listenRange[0]); d <= Math.min(2.0, app.listenRange[1]) + 1e-6; d += 0.1) distances.push(Math.round(d * 100) / 100);
+	const ultra = o.precision === 'ultra';
+	for (let d = Math.max(0.8, app.listenRange[0]); d <= Math.min(2.0, app.listenRange[1]) + 1e-6; d += ultra ? 0.05 : 0.1) distances.push(Math.round(d * 100) / 100);
+	// medios y agudos (solo ULTRA): absorción de cada material por octava, de 63 Hz a 16 kHz
+	const hf = ultra && o.hfWeight > 0 ? { weight: o.hfWeight, alpha: inp.names.map((n) => { const a = app.alphaOf(n); return [...a, a[a.length - 1]]; }) } : null;
 	const req: OptRequest = {
 		type: 'optimize', tris: inp.tris, triMat: inp.triMat, betaByMat: inp.betaByMat, seed: inp.seed,
 		fmax, ppw: prec.ppw, durationS: 1.0, engine: retry ? 'cpu' : app.engine, tLate: 0.12,
 		listenerY: P.listener[1], khY: P.khL[1], subY: P.sub[1], subEnabled: app.sub.enabled,
 		freqs, start, tune, subDelayMs: sub.extraDelayMs ?? 0, weights: plain(app.weights), distances,
-		apertures: o.apertures === 'varias' ? [50, 60, 70] : [60],
+		apertures: o.apertures === 'varias' ? (ultra ? [45, 50, 55, 60, 65, 70, 75] : [50, 60, 70]) : [60], ultra, hf,
 		facings: o.facings === 'todas' ? [0, 90, 180, 270] : [curFacing],
 		subMaxDist: o.sub === 'cerca' ? 1.5 : null, step: prec.step, method: o.method, bayes: { ...prec.bayes },
 		treatment: o.treatment && inp.objects.length ? { nStatic: inp.nStatic, objects: plain(inp.objects), objMat: inp.objMat } : null,
@@ -346,6 +351,13 @@ export function runOptimize(retry = false) {
 		};
 	};
 	optWorker.postMessage(req, [req.tris.buffer, req.triMat.buffer]);
+}
+
+/** ULTRA: termina antes, quedándose con lo mejor encontrado hasta ahora (afina los ajustes y acaba). */
+export function stopOptimize() {
+	if (!optWorker || !app.opt.running) return;
+	optWorker.postMessage({ type: 'opt-stop' });
+	app.opt = { ...app.opt, phase: 'Terminando con lo mejor encontrado' };
 }
 
 export function cancelOptimize() {
